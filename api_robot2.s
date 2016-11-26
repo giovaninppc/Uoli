@@ -46,7 +46,7 @@
 @ seta a velocidade do motor especificado
 
 set_motor_speed:
-		push {r7, lr}		@Salvando registradores callee-save
+		push {r7, lr}	 	@Salvando registradores callee-save
 	ldr r1, [r0]			@Copiando ID do motor para r1
 	ldr r0, [r0, #4]		@Copiando velocidade do motor em r0
 
