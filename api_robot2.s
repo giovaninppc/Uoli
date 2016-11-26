@@ -83,7 +83,7 @@ set_motors_speed:
 	bl set_motor_speed 		@Salta para a funcao para setar a velocidade de um dos motores
 		pop {r0}			@Pega o valor salvo, mas agora em r0
 	bl set_motor_speed 		@Salta para a funcao para setar a velocidade do outro motor
-		pop {pc}			@Retorna da funcao
+		pop {pc}			@Retorna da funcao, desempilha lr em pc
 
 
 
@@ -116,6 +116,23 @@ read_sonar:
 @ atualiza o vetor com as distancias dos sensores em: [start, end]
 
 read_sonars:
+		push {r7, lr}		@Empilha registradores callee-save
+	mov r7, #125			@Coloca 125 em r7, syscall read_sonar
+
+read_sonars_loop:
+	cmp r0, r1 				@Compara o valor atual com o final
+	bge read_sonars_end		@Salta para o fim (ge ou hs???)
+	mov r3, r0				@Copia o indice do sensor para r3
+
+	svc 0x0					@Faz a syscall, le o sensor de indice r0
+	str r0, [r2, r3, lsl 2] @Salva no apontador do vetor + (deslocamento)r3*4
+	mov r0, r3				@Copia r3 em r0
+	b read_sonars_loop		@Salta para o loop
+
+read_sonars_end:
+		pop {r7, pc}		@Restaura o valor de r7 e retorna
+
+
 
 
 @--------------------
