@@ -125,7 +125,7 @@ read_sonars_loop:
 	mov r3, r0				@Copia o indice do sensor para r3
 
 	svc 0x0					@Faz a syscall, le o sensor de indice r0
-	str r0, [r2, r3, lsl 2] @Salva no apontador do vetor + (deslocamento)r3*4
+	str r0, [r2, r3, lsl #2]@Salva no apontador do vetor + (deslocamento)r3*4
 	mov r0, r3				@Copia r3 em r0
 	b read_sonars_loop		@Salta para o loop
 
