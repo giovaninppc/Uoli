@@ -67,7 +67,15 @@ RESET_HANDLER:
 
 @ Initializing stacks:
 
+	mrs r0, CPSR
+	bic r0, r0, #0x1F
+	orr r0, r0, #SUPERVISOR_MODE
+	msr SPSR, r0
+
 	ldr SP, =SupervisorStack	@ Initializes supervisor mode stack
+
+			mov r0, #17
+			push {r0}
 	
 	mrs r0, CPSR
 	bic r0, r0, #0x1F
@@ -75,6 +83,9 @@ RESET_HANDLER:
 	msr SPSR, r0
 	
 	ldr SP, =IRQStack			@ Initializes IRQ mode stack
+
+			mov r0, #23
+			push {r0}
 	
 	mrs r0, CPSR
 	bic r0, r0, #0x1F
@@ -82,7 +93,7 @@ RESET_HANDLER:
 	msr SPSR, r0
 	
 	ldr SP, =UserStack			@ Initializes user mode stack
-	
+
 	mrs r0, CPSR
 	bic r0, r0, #0x1F
 	orr r0, r0, #SUPERVISOR_MODE
@@ -150,6 +161,7 @@ RESET_HANDLER:
 	msr  CPSR_c, #0x13	   @ SUPERVISOR mode, IRQ/FIQ enabled
 
 @IR PARA CODIGO DO USUARIO!!!!!
+	
 Loop:
     @b main
     b Loop
@@ -353,7 +365,7 @@ register_proximity_callback_svc:
 
 .data
 	SystemTime:				@Defining SystemTime 
-	.word 0
+	.fill 2, 4, 0
 
 	UserStack:				@Creating spaces to modes stacks
 	.skip STACK_SIZE * 4	@User stack

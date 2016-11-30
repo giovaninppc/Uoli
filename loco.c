@@ -12,7 +12,7 @@ void stop(motor_cfg_t *m0, motor_cfg_t *m1);
 void turnRight(motor_cfg_t *m0, motor_cfg_t *m1);
 void turnLeft(motor_cfg_t *m0, motor_cfg_t *m1);
 
-void _start(void){
+void main(void){
 
 	motor_cfg_t m0, m1;
 	unsigned int distances[16];
