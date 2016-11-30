@@ -11,12 +11,12 @@ O código é dividido em três subcamadas: (a) Sistema Operacional UóLi (SOUL),
 ## SOUL
 
 Sistema Operacional do robo.
-Controlaos acessos à memória, define interrupções de sistema e o acesso a periféricos.
+Controla os acessos à memória, define interrupções de sistema e o acesso a periféricos.
 
 ## BiCo
 
 Biblioteca que implementa em linguagem de montagem (ARM) as chamadas de sistema para
-ser cahamdo pelo código de usuário.
+ser chamado pelo código de usuário.
 Permite realizar a leitura dos sensores e a escrita de velocidades nos motores do robo.
 
 ## LoCo

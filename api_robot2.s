@@ -4,24 +4,45 @@
 
 
 @ Syscalls usadas:
-@	125 : read_sonar
+@	16 : read_sonar
 @		Parametro: 
-@			r0: identificador do read_sonar
+@			P0: identificador do read_sonar
 @		Retorno: 
 @			r0 distância
 @
-@	124 : write_motors
+@	17 : register_proximity_callback
 @		Parametros:
-@			r0: velocidade motor 0
-@			r1: velocidade motor 1
+@			P0: identificador do sonar
+@			P1: Limiar de distancia
+@			P2: ponteiro para a funcao de callback
 @
-@	126 : write_motor0
+@	18 : set_motor_speed
 @		Parametros:
-@			r0: velocidade do motor
+@			P0: identificador do motor [0 ou 1]
+@			P1: velocidade
 @
-@	127 : write_motor1
+@	19 : set_motors_speed
 @		Parametro:
-@			r0: velocidade do motor
+@			P0: velocidade do motor 0
+@			P1: velocidade do motor 1
+@
+@	20 : get_time
+@		Parametro: - 
+@		Retorno: 
+@			r0: tempo do sistema
+@
+@	21 : set_time
+@		Parametro:
+@			P0: tempo do sistema
+@
+@	22 : set_alarm
+@		Parametro:
+@			P0: ponteiro para funcao q vai ser chamada quando tocar alarme
+@			P1: tempo do sistema
+@		Retorno:
+@			r0: -1 se maximo de alarmes ativos > MAX_ALARMS
+@			  : -2 se o tempo eh invalido
+@			  : 0 caso contrario
 
 @ Definindo Rotinas Globais
 
@@ -47,20 +68,23 @@
 
 set_motor_speed:
 		push {r7, lr}	 	@Salvando registradores callee-save
-	ldr r1, [r0]			@Copiando ID do motor para r1
-	ldr r0, [r0, #4]		@Copiando velocidade do motor em r0
+	mov r1, r0				@Copia o endereco da struct para r1
+	ldr r0, [r1]			@Copiando ID do motor para r0
+	ldr r1, [r1, #4]		@Copiando velocidade do motor em r1
 
-	cmp r1, #1				@Compara com 0 (ver qual motor deve alterar a velocidade)
+	cmp r0, #1				@Compara com 0 (ver qual motor deve alterar a velocidade)
 	beq set_motor1_speed	@Salta ou nao para o set do motor especificado
 
 set_motor0_speed:
-	mov r7, #126			@Identificador da Syscall write_motor0
-	svc 0x0					@Faz a syscall (r0 = velocidade do motor / r7 = 126)
+	mov r7, #18				@Identificador da Syscall set_motor_speed
+	push {r0, r1}			@Parametros da syscall: P0 = ID, P1 = Velocidade
+	svc 0x0					@Faz a syscall
 	b set_motor_speed_end	@Salta para o final da funcao
 
 set_motor1_speed:
-	mov r7, #127			@Identificador da Syscall write_motor1
-	svc 0x0					@Faz a Syscall (r0 = velocidade do motor / r7 = 127s)
+	mov r7, #18				@Identificador da Syscall set_motor_speed
+	push {r0, r1}			@Parametros da syscall: P0 = ID, P1 = Velocidade
+	svc 0x0					@Faz a Syscall
 
 set_motor_speed_end:
 		pop {r7, pc}		@Retorna da funcao
@@ -98,7 +122,8 @@ set_motors_speed:
 
 read_sonar:
 		push {r7}			@Salva o registrador r7 q será usado para as Syscalls (callee-save)
-	mov r7, #125			@coloca o identificador da syscall em r7
+	mov r7, #16				@coloca o identificador da syscall em r7
+	push {r0}				@Parametros syscall: P0 = ID do sonar
 	svc 0x0					@Faz a syscall
 		pop {r7}			@Restaura o valor de r7 e retorna
 
@@ -117,14 +142,15 @@ read_sonar:
 
 read_sonars:
 		push {r7, lr}		@Empilha registradores callee-save
-	mov r7, #125			@Coloca 125 em r7, syscall read_sonar
+	mov r7, #16				@Coloca 16 em r7, syscall read_sonar
 
 read_sonars_loop:
 	cmp r0, r1 				@Compara o valor atual com o final
 	bge read_sonars_end		@Salta para o fim (ge ou hs???)
 	mov r3, r0				@Copia o indice do sensor para r3
 
-	svc 0x0					@Faz a syscall, le o sensor de indice r0
+	push {r0}				@Parametros: P0 = ID do sensor
+	svc 0x0					@Faz a syscall, le o sensor de indice P0
 	str r0, [r2, r3, lsl #2]@Salva no apontador do vetor + (deslocamento)r3*4
 	mov r0, r3				@Copia r3 em r0
 	b read_sonars_loop		@Salta para o loop
@@ -150,16 +176,35 @@ add_alarm:
 
 @--------------------
 @ get_time
+@ Parametros
+@	r0 = apontador para variavel q salva o tempo do sistema
+@ Retorno
+@	void
+@ Pega valor do tempo do sistema e salva no endereco de [r0]
 
 get_time:
+		push {r7, lr}		@ Salva registradores callee-save
+	mov r1, r0				@ Coloca em r1 o endereco da variavel de retorno
+	mov r7, #20				@ Syscall 20 - get_time
+	svc 0x0					@ Faz a syscall - retorna em r0 o tempo do sistema
+	ldr r0, [r1]			@ Salva o tempo no endereco passado
+		pop {r7, pc}		@ Retorna da funcao
+
 
 
 @--------------------
 @ set_time
+@ Parametros:
+@	r0 = o tempo t do sistema a ser setado
+@ Retorno:
+@	void
+@ Seta o tempo do sistema para t 
 
 set_time:
-
-
-
+		push {r7, lr}		@ Salva registradores callee-save
+	mov r7, #21				@ Coloca em r7 o numero da syscall, set_time
+	push {r0}				@ Empilha t (parametro em P0)
+	svc 0x0					@ Faz a syscall
+		pop {r7, pc}		@ Retorna da funcao
 
 @ Made with <3
