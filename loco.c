@@ -10,6 +10,7 @@
 void moveForward(motor_cfg_t *m0, motor_cfg_t *m1);
 void stop(motor_cfg_t *m0, motor_cfg_t *m1);
 void turnRight(motor_cfg_t *m0, motor_cfg_t *m1);
+void turnLeft(motor_cfg_t *m0, motor_cfg_t *m1);
 
 void _start(void){
 
@@ -92,7 +93,7 @@ void turnRight(motor_cfg_t *m0, motor_cfg_t *m1){
  *	2 apontadores para structs do tipo motor com as ids dos motores
  *Retorno:
  *	void */
-void turnRight(motor_cfg_t *m0, motor_cfg_t *m1){
+void turnLeft(motor_cfg_t *m0, motor_cfg_t *m1){
 
 	m0->speed = 0;
 	m1->speed = 10;

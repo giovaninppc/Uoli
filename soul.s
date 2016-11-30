@@ -69,13 +69,24 @@ RESET_HANDLER:
 
 	ldr SP, =SupervisorStack	@ Initializes supervisor mode stack
 	
-	cps #IRQ_MODE				@ Switches to IRQ mode
+	mrs r0, CPSR
+	bic r0, r0, #0x1F
+	orr r0, r0, #IRQ_MODE
+	msr SPSR, r0
+	
 	ldr SP, =IRQStack			@ Initializes IRQ mode stack
 	
-	cps #SYSTEM_MODE			@ Switches to system mode
+	mrs r0, CPSR
+	bic r0, r0, #0x1F
+	orr r0, r0, #SYSTEM_MODE
+	msr SPSR, r0
+	
 	ldr SP, =UserStack			@ Initializes user mode stack
 	
-	cps #0xSUPERVISOR_MODE		@ Switches back to supervisor mode
+	mrs r0, CPSR
+	bic r0, r0, #0x1F
+	orr r0, r0, #SUPERVISOR_MODE
+	msr SPSR, r0
 
 @ Setting GPT
 								@ Enable clock source
@@ -140,7 +151,7 @@ RESET_HANDLER:
 
 @IR PARA CODIGO DO USUARIO!!!!!
 Loop:
-    b main
+    @b main
     b Loop
 
 IRQ_HANDLER:
@@ -204,10 +215,19 @@ SYSCALL_HANDLER:
 @---------------------------
 set_motor_speed_svc:
 	push {r1-r3}			@ Save context on supervisor stack
-	cps #SYSTEM_MODE 		@ Switch to System mode (same stack as user)
+	
+	mrs r0, CPSR
+	bic r0, r0, #0x1F
+	orr r0, r0, #SYSTEM_MODE
+	msr SPSR, r0
+	
 	pop {r1, r2}			@ R1 <= P0; R2 <= P1;
-	cps #SUPERVISOR_MODE	@ Go back to supervisor mode
-
+	
+	mrs r0, CPSR
+	bic r0, r0, #0x1F
+	orr r0, r0, #SUPERVISOR_MODE
+	msr SPSR, r0
+	
 	eor r0, r0, r0			@ R0 <= 0
 	cmp r2, #0x3F
 	movhi r0, #-2			@ If |speed| is higher than 2^6-1, set R0 to -2
@@ -215,15 +235,17 @@ set_motor_speed_svc:
 	movhi r0, #-1			@ If |id| is higher than 1, set R0 to -1
 	
 	cmp r0, #0				@ If R0 != 0, return.
-	popne {r1-r3}			@ Get context back (if necessary)
-	movsne pc, lr 			@ Going back to user mode
-	
+	beq First				@ Continue
+	pop {r1-r3}				@ Get context back (if necessary)
+	movs pc, lr 			@ Going back to user mode
+
+First:
 	cmp r1, #1
 	beq Second				@ If id == 1, jump to second motor section
 	lsl r2, r2, #18			@ Prepare speed for masking
 	ldr r1, =DR				@ Load original DR
 	ldr r3, [r1]			@ Mask it in order to update Motor0 range
-	bic r3, r3, #1FC0000
+	bic r3, r3, #0x1FC0000
 	orr r3, r3, r2
 	str r3, [r1]			@ Update DR
 	
@@ -234,7 +256,7 @@ Second:
 	lsl r2, r2, #25			@ Prepare speed for masking
 	ldr r1, =DR				@ Load original DR
 	ldr r3, [r1]			@ Mask it in order to update Motor0 range
-	bic r3, r3, #FE000000
+	bic r3, r3, #0xFE000000
 	orr r3, r3, r2
 	str r3, [r1]			@Update DR
 	
@@ -244,10 +266,19 @@ Second:
 @---------------------------
 set_motors_speed_svc:
 	push {r1-r3}			@PILHA DO TIO3
-	cps #SYSTEM_MODE 		@Switch to System mode (same stack as user)
+	
+	mrs r0, CPSR
+	bic r0, r0, #0x1F
+	orr r0, r0, #SYSTEM_MODE
+	msr SPSR, r0
+	
 	pop {r1, r2}			@R1 <= P0; R2 <= P1;
-	cps #SUPERVISOR_MODE	@Go back to supervisor mode
-
+	
+	mrs r0, CPSR
+	bic r0, r0, #0x1F
+	orr r0, r0, #SUPERVISOR_MODE
+	msr SPSR, r0
+	
 	eor r0, r0, r0			@ R0 <= 0
 	cmp r2, #0x3F
 	movhi r0, #-2			@ If |speed1| is higher than 2^6-1, set R0 to -2
@@ -255,17 +286,18 @@ set_motors_speed_svc:
 	movhi r0, #-1			@ If |speed0| is higher than 2^6-1, set R0 to -1
 	
 	cmp r0, #0				@ If R0 != 0, return.
-	popne {r1-r3}
-	movsne pc, lr 			@Going back to users mode
+	beq continue_set_motors	@ Continue 
+	pop {r1-r3}
+	movs pc, lr 			@Going back to users mode
 	
-	
+continue_set_motors:
 	lsl r1, r1, #18			@ Prepare speed0 for masking
 	lsl r2, r2, #25			@ Prepare speed1 for masking
 	orr r2, r1, r2
 	
 	ldr r1, =DR				@ Load original DR
 	ldr r3, [r1]			@ Mask it in order to update Motor0 range
-	bic r3, r3, #1FC0000
+	bic r3, r3, #0x1FC0000
 	orr r3, r3, r2
 	str r3, [r1]
 	
@@ -274,16 +306,24 @@ set_motors_speed_svc:
 
 @---------------------------
 set_time_svc:
-	push {r0-r1}			@Saving the users register state (Supervisor stack!)
+	push {r0-r2}			@Saving the users register state (Supervisor stack!)
 
-	cps #SYSTEM_MODE 		@Switch to System mode (same stack as user)
-	pop {r0}				@Pop the parameter value (System stack!)
-	cps #SUPERVISOR_MODE	@Go back to supervisor mode
+	mrs r0, CPSR
+	bic r0, r0, #0x1F
+	orr r0, r0, #SYSTEM_MODE
+	msr SPSR, r0
 
+	pop {r2}				@Pop the parameter value (System stack!)
+	
+	mrs r0, CPSR
+	bic r0, r0, #0x1F
+	orr r0, r0, #SUPERVISOR_MODE
+	msr SPSR, r0
+	
 	ldr r1, =SystemTime		@Get the SystemTime address
-	str r0, [r1]			@Setting the time
+	str r2, [r1]			@Setting the time
 
-	pop {r0-r1}				@Poping the Users state
+	pop {r0-r2}				@Poping the Users state
 	movs pc, lr 			@Going back to users mode
 
 @---------------------------
