@@ -177,7 +177,9 @@ IRQ_HANDLER:
 	ldr r1, [r0]			@ Load SystemTime value on r1
 	add r1, r1, #1			@ Time + 1
 	str r1, [r0]			@ Store on SystemTime
-	
+
+	//Não esquecer de verificar alarmes!!!
+
 	pop {r0-r1}				@ Recovers context
 	sub lr, lr, #4			@ Correct the link register
 	movs pc, lr 			@ Go back to the last mode
@@ -351,7 +353,51 @@ get_time_svc:
 
 @---------------------------
 set_alarm_svc:
+	push {r1-r3}			@ Save context on supervisor stack
 
+	mrs r0, CPSR
+	bic r0, r0, #0x1F
+	orr r0, r0, #SYSTEM_MODE
+	msr SPSR, r0
+
+	pop {r1, r2}			@ R1 <= Callback function pointer
+							@ R2 <= Target system time
+
+	mrs r0, CPSR
+	bic r0, r0, #0x1F
+	orr r0, r0, #SUPERVISOR_MODE
+	msr SPSR, r0
+
+	ldr r0, =SystemTime		@ Loads SystemTime address
+	ldr r0, [r0]			@ Loads SystemTime
+
+	cmp r2, r0				@ If target system time is less than or equal to current
+	movls r0, #-2			@system time, returns -2.
+	bls set_alarm_end
+
+	mov r0, =Alarms			@ Loads Alarms base address into R0
+	mov r3, #0				@ Initializes R3 as index
+
+find_free_alarm:
+	ldr r4, [r0, r3]		@ Loads alarm time into R4
+	cmp r4, #-1				@ Checks if it is free (-1)
+	beq free_alarm_found
+	add r3, r3, #8			@ Increments index.
+	cmp r3, #MAX_ALARMS
+	blo find_free_alarm		@ Keep searching
+
+	cmp r3, #MAX_ALARMS		@ Checks if search failed
+	movhs r0, #-1			@ If failed, return -1
+	bhs set_alarm_end
+
+free_alarm_found:			@ Free alarm found at r0 + r3.
+	str r2, [r0, r3]		@ Adds new alarm target time
+	add r3, r3, #4
+	str r1, [r0, r3]		@ Adds new alarm target callback
+
+set_alarm_end:
+	pop {r1-r3}
+	movs pc, lr 			@Going back to users mode
 
 @---------------------------
 read_sonar_svc:
@@ -366,7 +412,8 @@ register_proximity_callback_svc:
 .data
 	SystemTime:				@Defining SystemTime 
 	.fill 1, 4, 0
-
+	Alarms:					@Alarms vector
+	.fill MAX_ALARMS, 8, -1
 							@Creating spaces to modes stacks
 	.fill STACK_SIZE, 4, 0
 	UserStack:
