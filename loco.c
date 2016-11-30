@@ -15,8 +15,8 @@ void turnLeft(motor_cfg_t *m0, motor_cfg_t *m1);
 void main(void){
 
 
-	int a = 0;
-
+	int a = 10;
+	set_time(a);
 	while(1){
 		get_time(&a);
 	}
