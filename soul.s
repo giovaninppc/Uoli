@@ -13,8 +13,9 @@
 .set SUPERVISOR_MODE,	0x00000013
 .set IRQ_MODE,			0x00000012
 .set SYSTEM_MODE,		0x0000001F
+.set USER_MODE,			0x00000010
 .set GDIRMask,			0xFFFC003E
-
+.set ENTRY_POINT, 		0x77802000
 
 @ GPT registers addresses constants
 .set GPT_CR,			0x53FA0000
@@ -56,6 +57,8 @@ InterruptVector:
 .text
 
 RESET_HANDLER:
+	msr CPSR_c, #0xD3			@ SUPERVISOR mode, IRQ/FIQ disabled
+	
 	@ Sets interrupt table base address on coprocessor 15.
 	ldr r0, =InterruptVector
 	mcr p15, 0, r0, c12, c0, 0
@@ -66,7 +69,6 @@ RESET_HANDLER:
 	str r0,[r2]
 
 @ Initializing stacks:
-
 	mrs r0, CPSR
 	bic r0, r0, #0x1F
 	orr r0, r0, #SUPERVISOR_MODE
@@ -117,7 +119,6 @@ RESET_HANDLER:
 @ Setting GPIO
 								@ Sets GPIO direction register
 	ldr r0, =GDIRMask 			@ Loads GDIRMask value address
-	ldr r0, [r0]				@ Loads the value of the mask
 	ldr r1, =GDIR 				@ Load GDIR address
 	str r0, [r1]				@ Store mask on the address
 	
@@ -152,13 +153,18 @@ RESET_HANDLER:
 	str	r0, [r1, #TZIC_INTCTRL]
 
 	@ Enables interruptions
-	msr  CPSR_c, #0x13	   @ SUPERVISOR mode, IRQ/FIQ enabled
-
-@IR PARA CODIGO DO USUARIO!!!!!
+	msr CPSR_c, #0x13	   @SUPERVISOR mode, IRQ/FIQ enabled
 	
-Loop:
-    @b main
-    b Loop
+	mrs r0, CPSR
+	bic r0, r0, #0x1F
+	orr r0, r0, #USER_MODE
+	msr SPSR, r0
+	
+	@VAI PRO MODO DE USUARIO
+
+    ldr r0, =ENTRY_POINT
+    push {r0}
+    bx r0
 
 IRQ_HANDLER:
     push {r0-r1}			@ Secures context
@@ -334,12 +340,12 @@ set_time_svc:
 
 @---------------------------
 get_time_svc:
-	push {r1}				@Saving state, context
+	push {r1}			@Saving state, context
 	
 	ldr r1, =SystemTime		@Load the SystemTime address
 	ldr r0, [r1]			@Load the SystemTime value on the return register
 	
-	pop {r1}				@Pop the user state
+	pop {r1}			@Pop the user state
 	movs pc, lr 			@Go back to User mode and users code
 
 
@@ -359,11 +365,12 @@ register_proximity_callback_svc:
 
 .data
 	SystemTime:				@Defining SystemTime 
-	.fill 2, 4, 0
+	.fill 1, 4, 0
 
-	UserStack:				@Creating spaces to modes stacks
+							@Creating spaces to modes stacks
 	.fill STACK_SIZE, 4, 0
-	SupervisorStack:
+	UserStack:
 	.fill STACK_SIZE, 4, 0	@supervisor stack
-	IRQStack:
+	SupervisorStack:
 	.fill STACK_SIZE, 4, 0	@IQR stack
+	IRQStack:

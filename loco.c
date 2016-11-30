@@ -14,6 +14,14 @@ void turnLeft(motor_cfg_t *m0, motor_cfg_t *m1);
 
 void main(void){
 
+
+	int a = 0;
+
+	while(1){
+		get_time(&a);
+	}
+
+/*
 	motor_cfg_t m0, m1;
 	unsigned int distances[16];
 
@@ -49,7 +57,7 @@ void main(void){
 		distances[0] = read_sonar(0);
 
 	}
-
+*/
 }
 
 /*Faz o Uoli se movimentar para a frente
