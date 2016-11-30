@@ -41,12 +41,9 @@
 .org 0x0
 .section .iv,"a"
 
-_start:
-
 InterruptVector:
 	b RESET_HANDLER
 
-@SYSCALL
 .org 0x08
 	b SYSCALL_HANDLER
 
@@ -69,58 +66,50 @@ RESET_HANDLER:
 	str r0,[r2]
 
 @ Initializing stacks:
-	@ Initializes supervisor mode stack
-	ldr SP, =SupervisorStack
+
+	ldr SP, =SupervisorStack	@ Initializes supervisor mode stack
 	
-	@ Switches to IRQ mode
-	cps #IRQ_MODE
+	cps #IRQ_MODE				@ Switches to IRQ mode
+	ldr SP, =IRQStack			@ Initializes IRQ mode stack
 	
-	@ Initializes IRQ mode stack
-	ldr SP, =IRQStack
+	cps #SYSTEM_MODE			@ Switches to system mode
+	ldr SP, =UserStack			@ Initializes user mode stack
 	
-	@ Switches to system mode
-	cps #SYSTEM_MODE
-	
-	@ Initializes user mode stack
-	ldr SP, =UserStack
-	
-	@ Switches back to supervisor mode
-	cps #0xSUPERVISOR_MODE
+	cps #0xSUPERVISOR_MODE		@ Switches back to supervisor mode
 
 @ Setting GPT
-	@ Enable clock source
-	ldr r2, =GPT_CR
-	mov r0, #0x41
-	str r0, [r2]
+								@ Enable clock source
+	ldr r2, =GPT_CR 			@ Loading GPT_CR address
+	mov r0, #0x41 				@ adding  aflag mask on r0
+	str r0, [r2]				@ Writing the flags on GPT_CR
 
-	@ Resetting prescaler
-	ldr r2, =GPT_PR
-	mov r0, #0
-	str r0, [r2]
+								@ Resetting prescaler
+	ldr r2, =GPT_PR				@ Loading GPT_PR address
+	mov r0, #0					@ r0 <= 0
+	str r0, [r2]				@ Setting prescaler t0 zero
 
-	@ Setting prescaler limit
-	ldr r2, =GPT_OCR1
-	mov r0, #TIME_SZ
-	str r0, [r2]
+								@ Setting prescaler limit
+	ldr r2, =GPT_OCR1 			@ Loading GPT_OCR1 address
+	mov r0, #TIME_SZ			@ Add time limit constant to ro 
+	str r0, [r2]				@ Setting the limit as TIME_SZ
 
-	@ Enable interruptions
-	ldr r2, =GPT_IR
-	mov r0, #1
-	str r0, [r2]
+								@ Enable interruptions
+	ldr r2, =GPT_IR				@ Loading GPT_IR address
+	mov r0, #1 					@ r0 <= 1
+	str r0, [r2]				@ Setting interruptions to 1, true
 
 @ Setting GPIO
-	@ Sets GPIO direction register
-	ldr r0, =GDIRMask
-	ldr r0, [r0]
-	ldr r1, =GDIR
-	str r0, [r1]
+								@ Sets GPIO direction register
+	ldr r0, =GDIRMask 			@ Loads GDIRMask value address
+	ldr r0, [r0]				@ Loads the value of the mask
+	ldr r1, =GDIR 				@ Load GDIR address
+	str r0, [r1]				@ Store mask on the address
 	
 @ Setting TZIC
-	@ Enable interruption controller
-	ldr	r1, =TZIC_BASE
 
-	@ Sets interruption #39 of GPT as non safe.
-	mov	r0, #(1 << 7)
+	ldr	r1, =TZIC_BASE			@ Enable interruption controller
+
+	mov	r0, #(1 << 7)			@ Sets interruption #39 of GPT as non safe.
 	str	r0, [r1, #TZIC_INTSEC1]
 
 	@ Enables GPT interruption #39
@@ -155,70 +144,69 @@ Loop:
     b Loop
 
 IRQ_HANDLER:
-	@Secures context
-    push {r0-r1}
+    push {r0-r1}			@ Secures context
 
-	@ Signs that the interruption has been performed
-	ldr r0, =GPT_SR
+	ldr r0, =GPT_SR			@ Signs that the interruption has been performed
 	mov r1, #1
 	str r1, [r0]
 	
-	@ Increments system clock
-	ldr r0, =SystemTime
-	ldr r1, [r0]
-	add r1, r1, #1
-	str r1, [r0]
+	ldr r0, =SystemTime		@ Increments system clock
+	ldr r1, [r0]			@ Load SystemTime value on r1
+	add r1, r1, #1			@ Time + 1
+	str r1, [r0]			@ Store on SystemTime
 	
-	@ Recovers context
-	pop {r0-r1}
-	sub lr, lr, #4
-	movs pc, lr
+	pop {r0-r1}				@ Recovers context
+	sub lr, lr, #4			@ Correct the link register
+	movs pc, lr 			@ Go back to the last mode
 
-@SYSCALL_HANDLER
+@ SYSCALL_HANDLER-------------------
+@
 @ r7 contains the syscall number
 @ Parameters:
 @	passed by the user stack
-@16 - read_sonar
-@17 - register_proximity_callback
-@18 - set_motor_speed
-@19 - set_motors_speed
-@20 - get_time
-@21 - set_time
-@22 - set_alarm
+@
+@number/function
+@ 16 - read_sonar
+@ 17 - register_proximity_callback
+@ 18 - set_motor_speed
+@ 19 - set_motors_speed
+@ 20 - get_time
+@ 21 - set_time
+@ 22 - set_alarm
 
 SYSCALL_HANDLER:
 
 	cmp r7, #16
-	beq read_sonar
+	beq read_sonar_svc
 
 	cmp r7, #17
-	beq register_proximity_callback
+	beq register_proximity_callback_svc
 	
 	cmp r7, #18
-	beq set_motor_speed
+	beq set_motor_speed_svc
 
 	cmp r7, #19
-	beq set_motors_speed
+	beq set_motors_speed_svc
 
 	cmp r7, #20
-	beq get_time
+	beq get_time_svc
 
 	cmp r7, #21
-	beq set_time
+	beq set_time_svc
 
 	cmp r7, #22
-	beq  set_alarm
+	beq set_alarm_svc
 
 	@default treatment
 	movs pc, lr
 
 
 @---------------------------
-set_motor_speed:
-	push {r1-r3}			@PILHA DO TIO2
-	cps #SYSTEM_MODE 		@Switch to System mode (same stack as user)
-	pop {r1, r2}			@R1 <= P0; R2 <= P1;
-	cps #SUPERVISOR_MODE	@Go back to supervisor mode
+set_motor_speed_svc:
+	push {r1-r3}			@ Save context on supervisor stack
+	cps #SYSTEM_MODE 		@ Switch to System mode (same stack as user)
+	pop {r1, r2}			@ R1 <= P0; R2 <= P1;
+	cps #SUPERVISOR_MODE	@ Go back to supervisor mode
 
 	eor r0, r0, r0			@ R0 <= 0
 	cmp r2, #0x3F
@@ -227,31 +215,65 @@ set_motor_speed:
 	movhi r0, #-1			@ If |id| is higher than 1, set R0 to -1
 	
 	cmp r0, #0				@ If R0 != 0, return.
-	movsne pc, lr 			@Going back to users mode
+	popne {r1-r3}			@ Get context back (if necessary)
+	movsne pc, lr 			@ Going back to user mode
 	
 	cmp r1, #1
 	beq Second				@ If id == 1, jump to second motor section
-	lsl r2, #18				@ Prepare speed for masking
+	lsl r2, r2, #18			@ Prepare speed for masking
 	ldr r1, =DR				@ Load original DR
 	ldr r3, [r1]			@ Mask it in order to update Motor0 range
-	and r3, r3, #FE03FFFF
+	bic r3, r3, #1FC0000
 	orr r3, r3, r2
-	str [r1], r3			@Update DR
-	movs pc, lr 			@Going back to users mode
+	str r3, [r1]			@ Update DR
+	
+	pop {r1-r3}				@ Restore context
+	movs pc, lr 			@ Going back to users mode
 	
 Second:
-	lsl r2, #25				@ Prepare speed for masking
+	lsl r2, r2, #25			@ Prepare speed for masking
 	ldr r1, =DR				@ Load original DR
 	ldr r3, [r1]			@ Mask it in order to update Motor0 range
-	and r3, r3, #1FFFFFF
+	bic r3, r3, #FE000000
 	orr r3, r3, r2
-	str [r1], r3			@Update DR
+	str r3, [r1]			@Update DR
 	
 	pop {r1-r3}
 	movs pc, lr 			@Going back to users mode
 
 @---------------------------
-set_time:
+set_motors_speed_svc:
+	push {r1-r3}			@PILHA DO TIO3
+	cps #SYSTEM_MODE 		@Switch to System mode (same stack as user)
+	pop {r1, r2}			@R1 <= P0; R2 <= P1;
+	cps #SUPERVISOR_MODE	@Go back to supervisor mode
+
+	eor r0, r0, r0			@ R0 <= 0
+	cmp r2, #0x3F
+	movhi r0, #-2			@ If |speed1| is higher than 2^6-1, set R0 to -2
+	cmp r1, #0x3F
+	movhi r0, #-1			@ If |speed0| is higher than 2^6-1, set R0 to -1
+	
+	cmp r0, #0				@ If R0 != 0, return.
+	popne {r1-r3}
+	movsne pc, lr 			@Going back to users mode
+	
+	
+	lsl r1, r1, #18			@ Prepare speed0 for masking
+	lsl r2, r2, #25			@ Prepare speed1 for masking
+	orr r2, r1, r2
+	
+	ldr r1, =DR				@ Load original DR
+	ldr r3, [r1]			@ Mask it in order to update Motor0 range
+	bic r3, r3, #1FC0000
+	orr r3, r3, r2
+	str r3, [r1]
+	
+	pop {r1-r3}				@Update DR
+	movs pc, lr 			@Going back to users mode
+
+@---------------------------
+set_time_svc:
 	push {r0-r1}			@Saving the users register state (Supervisor stack!)
 
 	cps #SYSTEM_MODE 		@Switch to System mode (same stack as user)
@@ -261,27 +283,41 @@ set_time:
 	ldr r1, =SystemTime		@Get the SystemTime address
 	str r0, [r1]			@Setting the time
 
-	pop {r0-r1}			@Poping the Users state
+	pop {r0-r1}				@Poping the Users state
 	movs pc, lr 			@Going back to users mode
 
 @---------------------------
-get_time:
-	push {r1}
+get_time_svc:
+	push {r1}				@Saving state, context
 	
 	ldr r1, =SystemTime		@Load the SystemTime address
 	ldr r0, [r1]			@Load the SystemTime value on the return register
 	
-	pop {r1}
+	pop {r1}				@Pop the user state
 	movs pc, lr 			@Go back to User mode and users code
+
+
+@---------------------------
+set_alarm_svc:
+
+
+@---------------------------
+read_sonar_svc:
+
+
+@---------------------------
+register_proximity_callback_svc:
+
 
 @Data Section>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 .data
-	SystemTime:
+	SystemTime:				@Defining SystemTime 
 	.word 0
-	UserStack:
-	.skip STACK_SIZE * 4
+
+	UserStack:				@Creating spaces to modes stacks
+	.skip STACK_SIZE * 4	@User stack
 	SupervisorStack:
-	.skip STACK_SIZE * 4
+	.skip STACK_SIZE * 4	@supervisor stack
 	IRQStack:
-	.skip STACK_SIZE * 4
+	.skip STACK_SIZE * 4	@IQR stack
