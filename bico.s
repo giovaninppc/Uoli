@@ -170,9 +170,19 @@ register_proximity_callback:
 
 @--------------------
 @ add_alarm
+@ Parametros:
+@	r0 = endereco da funcao f de callback
+@	r1 = tempo para invocar a funcao
+@ Retorno:
+@	void
+@ "Seta" um alarme que dispara uma funcao f 
 
 add_alarm:
-
+		push {r7, lr}		@ Salva registradores callee-save
+	mov r7, #22				@ Coloca o numero da syscall em r7
+	push {r0, r1}
+	svc 0x0
+		pop {r7, pc}
 
 @--------------------
 @ get_time

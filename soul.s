@@ -163,11 +163,10 @@ RESET_HANDLER:
 	@VAI PRO MODO DE USUARIO
 
     ldr r0, =ENTRY_POINT
-    push {r0}
     bx r0
 
 IRQ_HANDLER:
-    push {r0-r1}			@ Secures context
+    push {r0-r4}			@ Secures context
 
 	ldr r0, =GPT_SR			@ Signs that the interruption has been performed
 	mov r1, #1
@@ -178,9 +177,58 @@ IRQ_HANDLER:
 	add r1, r1, #1			@ Time + 1
 	str r1, [r0]			@ Store on SystemTime
 
-	//Não esquecer de verificar alarmes!!!
+	@Checks enabled alarms
+	mov r0, =Alarms			@ Loads Alarms base address into R0
+	mov r3, #0				@ Initializes R3 as index
 
-	pop {r0-r1}				@ Recovers context
+check_alarms:
+	ldr r4, [r0, r3]		@ Loads alarm time into R4
+	
+	cmp r4, #-1				@ Checks if it is not enabled
+	beq next_alarm
+	cmp r1, r4				@ Checks if it is not equal to system time
+	bne next_alarm
+	
+	mov r4, #-1
+	str r4, [r0, r3]		@ Disables alarm
+	
+	add r2, r3, #4
+	ldr r2, [r0, r2]		@ Load function address on r2
+	
+	push {r0-r12}
+	
+	mrs r0, CPSR
+	bic r0, r0, #0x1F
+	orr r0, r0, #USER_MODE
+	msr SPSR, r0
+	
+    bxl r2					@ Invokes callback
+    
+    push {r7}
+    
+    mov r7, #666
+    svc 0x0
+    
+    pop {r0-r12}
+    
+    mrs r0, CPSR
+	bic r0, r0, #0x1F
+	orr r0, r0, #SYSTEM_MODE
+	msr SPSR, r0
+	
+	pop{r7}
+	
+	mrs r0, CPSR
+	bic r0, r0, #0x1F
+	orr r0, r0, #IRQ_MODE
+	msr SPSR, r0
+    
+next_alarm:
+	add r3, r3, #8			@ Increments index.
+	cmp r3, #MAX_ALARMS
+	blo check_alarms		@ Keep chekcing
+
+	pop {r0-r4}				@ Recovers context
 	sub lr, lr, #4			@ Correct the link register
 	movs pc, lr 			@ Go back to the last mode
 
@@ -221,6 +269,9 @@ SYSCALL_HANDLER:
 
 	cmp r7, #22
 	beq set_alarm_svc
+	
+	cmp r7, #666
+	beq internal_svc
 
 	@default treatment
 	movs pc, lr
@@ -353,7 +404,7 @@ get_time_svc:
 
 @---------------------------
 set_alarm_svc:
-	push {r1-r3}			@ Save context on supervisor stack
+	push {r1-r4}			@ Save context on supervisor stack
 
 	mrs r0, CPSR
 	bic r0, r0, #0x1F
@@ -372,10 +423,10 @@ set_alarm_svc:
 	ldr r0, [r0]			@ Loads SystemTime
 
 	cmp r2, r0				@ If target system time is less than or equal to current
-	movls r0, #-2			@system time, returns -2.
+	movle r0, #-2			@system time, returns -2.
 	bls set_alarm_end
 
-	mov r0, =Alarms			@ Loads Alarms base address into R0
+	ldr r0, =Alarms			@ Loads Alarms base address into R0
 	mov r3, #0				@ Initializes R3 as index
 
 find_free_alarm:
@@ -386,7 +437,6 @@ find_free_alarm:
 	cmp r3, #MAX_ALARMS
 	blo find_free_alarm		@ Keep searching
 
-	cmp r3, #MAX_ALARMS		@ Checks if search failed
 	movhs r0, #-1			@ If failed, return -1
 	bhs set_alarm_end
 
@@ -396,8 +446,16 @@ free_alarm_found:			@ Free alarm found at r0 + r3.
 	str r1, [r0, r3]		@ Adds new alarm target callback
 
 set_alarm_end:
-	pop {r1-r3}
+	pop {r1-r4}
 	movs pc, lr 			@Going back to users mode
+
+@---------------------------
+internal_svc:
+	mrs r7, CPSR
+	bic r7, r7, #0x1F
+	orr r7, r7, #IRQ_MODE
+	msr SPSR, r7
+	mov pc, lr
 
 @---------------------------
 read_sonar_svc:
