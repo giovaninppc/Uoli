@@ -73,9 +73,6 @@ RESET_HANDLER:
 	msr SPSR, r0
 
 	ldr SP, =SupervisorStack	@ Initializes supervisor mode stack
-
-			mov r0, #17
-			push {r0}
 	
 	mrs r0, CPSR
 	bic r0, r0, #0x1F
@@ -83,9 +80,6 @@ RESET_HANDLER:
 	msr SPSR, r0
 	
 	ldr SP, =IRQStack			@ Initializes IRQ mode stack
-
-			mov r0, #23
-			push {r0}
 	
 	mrs r0, CPSR
 	bic r0, r0, #0x1F
@@ -93,7 +87,7 @@ RESET_HANDLER:
 	msr SPSR, r0
 	
 	ldr SP, =UserStack			@ Initializes user mode stack
-
+	
 	mrs r0, CPSR
 	bic r0, r0, #0x1F
 	orr r0, r0, #SUPERVISOR_MODE
@@ -368,8 +362,8 @@ register_proximity_callback_svc:
 	.fill 2, 4, 0
 
 	UserStack:				@Creating spaces to modes stacks
-	.skip STACK_SIZE * 4	@User stack
+	.fill STACK_SIZE, 4, 0
 	SupervisorStack:
-	.skip STACK_SIZE * 4	@supervisor stack
+	.fill STACK_SIZE, 4, 0	@supervisor stack
 	IRQStack:
-	.skip STACK_SIZE * 4	@IQR stack
+	.fill STACK_SIZE, 4, 0	@IQR stack
