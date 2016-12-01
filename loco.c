@@ -11,14 +11,14 @@ void moveForward(motor_cfg_t *m0, motor_cfg_t *m1);
 void stop(motor_cfg_t *m0, motor_cfg_t *m1);
 void turnRight(motor_cfg_t *m0, motor_cfg_t *m1);
 void turnLeft(motor_cfg_t *m0, motor_cfg_t *m1);
-
+void amor();
 
 void main(void){
 
 	int a = 0;
 
 	get_time(&a);
-
+	get_time(&a);
 	while(1){
 		a++;
 	}
@@ -60,6 +60,12 @@ void main(void){
 
 	}
 */
+}
+
+void amor(){
+	int b;
+	get_time(&b);
+	return;
 }
 
 /*Faz o Uoli se movimentar para a frente

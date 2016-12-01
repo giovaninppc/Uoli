@@ -468,10 +468,10 @@ register_proximity_callback_svc:
 @Data Section>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 .data
-	SystemTime:				@Defining SystemTime 
+	SystemTime:				@Defining SystemTime.
 	.fill 1, 4, 0
 	Alarms:					@Alarms vector
-	.fill MAX_ALARMS, 8, -1
+	.fill 2*MAX_ALARMS, 4, -1
 							@Creating spaces to modes stacks
 	.fill STACK_SIZE, 4, 0
 	UserStack:
@@ -479,3 +479,5 @@ register_proximity_callback_svc:
 	SupervisorStack:
 	.fill STACK_SIZE, 4, 0	@IQR stack
 	IRQStack:
+
+@ Made with <3 by Giovani & Sterle
