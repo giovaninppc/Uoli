@@ -163,7 +163,6 @@ RESET_HANDLER:
 	@VAI PRO MODO DE USUARIO
 
     ldr r0, =ENTRY_POINT
-    push {r0}
     bx r0
 
 IRQ_HANDLER:
@@ -226,7 +225,7 @@ check_alarms:
     
 next_alarm:
 	add r3, r3, #8			@ Increments index.
-	cmp r3, #MAX_ALARMS
+	cmp r3, #MAX_ALARMS << 3
 	blo check_alarms		@ Keep chekcing
 
 	pop {r0-r4}				@ Recovers context
@@ -435,7 +434,7 @@ find_free_alarm:
 	cmp r4, #-1				@ Checks if it is free (-1)
 	beq free_alarm_found
 	add r3, r3, #8			@ Increments index.
-	cmp r3, #MAX_ALARMS
+	cmp r3, #MAX_ALARMS << 3
 	blo find_free_alarm		@ Keep searching
 
 	movhs r0, #-1			@ If failed, return -1
