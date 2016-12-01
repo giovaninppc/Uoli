@@ -1,0 +1,11 @@
+make:           make all
+
+Rodar o codigo: arm-sim --rom=/home/specg12-1/mc404/simulador/simulador_player/bin/dumboot.bin --sd=disk.img -g
+
+Ligar com o gdb: arm-eabi-gdb XXXXX.x
+
+Ligar simulador: player /home/specg12-1/mc404/simulador/simulador_player/worlds_mc404/simple.cfg 
+
+Executar simulador: armsim_player --rom=/home/specg12-1/mc404/simulador/simulador_player/bin/dumboot.bin --sd=disk.img 
+
+  

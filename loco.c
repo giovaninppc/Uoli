@@ -15,10 +15,14 @@ void amor();
 
 void main(void){
 
-	int a = 0;
+	motor_cfg_t m0, m1;
+	int a;
 
-	get_time(&a);
-	get_time(&a);
+	m0.id = 0;
+	m1.id = 1;
+
+	moveForward(&m0, &m1);
+
 	while(1){
 		a++;
 	}

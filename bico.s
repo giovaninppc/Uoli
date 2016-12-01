@@ -72,7 +72,7 @@ set_motor_speed:
 	ldr r0, [r1]			@Copiando ID do motor para r0
 	ldr r1, [r1, #4]		@Copiando velocidade do motor em r1
 
-	cmp r0, #1				@Compara com 0 (ver qual motor deve alterar a velocidade)
+	cmp r0, #1				@Compara com 1 (ver qual motor deve alterar a velocidade)
 	beq set_motor1_speed	@Salta ou nao para o set do motor especificado
 
 set_motor0_speed:

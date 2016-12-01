@@ -42,6 +42,8 @@
 .org 0x0
 .section .iv,"a"
 
+_start:
+
 InterruptVector:
 	b RESET_HANDLER
 
@@ -307,7 +309,7 @@ set_motor_speed_svc:
 First:
 	cmp r1, #1
 	beq Second				@ If id == 1, jump to second motor section
-	lsl r2, r2, #18			@ Prepare speed for masking
+	lsl r2, r2, #19			@ Prepare speed for masking
 	ldr r1, =DR				@ Load original DR
 	ldr r3, [r1]			@ Mask it in order to update Motor0 range
 	bic r3, r3, #0x1FC0000
@@ -318,7 +320,7 @@ First:
 	movs pc, lr 			@ Going back to users mode
 	
 Second:
-	lsl r2, r2, #25			@ Prepare speed for masking
+	lsl r2, r2, #26			@ Prepare speed for masking
 	ldr r1, =DR				@ Load original DR
 	ldr r3, [r1]			@ Mask it in order to update Motor0 range
 	bic r3, r3, #0xFE000000
