@@ -69,8 +69,8 @@
 set_motor_speed:
 		push {r7, lr}	 	@Salvando registradores callee-save
 	mov r1, r0				@Copia o endereco da struct para r1
-	ldr r0, [r1]			@Copiando ID do motor para r0
-	ldr r1, [r1, #4]		@Copiando velocidade do motor em r1
+	ldrb r0, [r1]			@Copiando ID do motor para r0 (unsigned char)
+	ldrb r1, [r1, #1]		@Copiando velocidade do motor em r1 (unsigned char)
 
 	cmp r0, #1				@Compara com 1 (ver qual motor deve alterar a velocidade)
 	beq set_motor1_speed	@Salta ou nao para o set do motor especificado

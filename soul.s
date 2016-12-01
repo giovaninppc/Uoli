@@ -4,7 +4,7 @@
 @ Operational System - SOUL
 
 @ System time clock divider constant
-.set TIME_SZ,			0x000000C8
+.set TIME_SZ,			0x00000064
 
 @ System constants
 .set MAX_ALARMS,		0x00000008
@@ -59,44 +59,22 @@ InterruptVector:
 .text
 
 RESET_HANDLER:
-	msr CPSR_c, #0xD3			@ SUPERVISOR mode, IRQ/FIQ disabled
-	
+	msr CPSR_c, #0xD3	   @SUPERVISOR mode, IRQ/FIQ disabled
+
 	@ Sets interrupt table base address on coprocessor 15.
 	ldr r0, =InterruptVector
 	mcr p15, 0, r0, c12, c0, 0
-	
-	@ Initializes SystemTime counter to 0.
-	ldr r2, =SystemTime
-	mov r0,#0
-	str r0,[r2]
 
 @ Initializing stacks:
-	mrs r0, CPSR
-	bic r0, r0, #0x1F
-	orr r0, r0, #SUPERVISOR_MODE
-	msr SPSR, r0
-
 	ldr SP, =SupervisorStack	@ Initializes supervisor mode stack
 	
-	mrs r0, CPSR
-	bic r0, r0, #0x1F
-	orr r0, r0, #IRQ_MODE
-	msr SPSR, r0
-	
+	msr CPSR_c, #IRQ_MODE
 	ldr SP, =IRQStack			@ Initializes IRQ mode stack
 	
-	mrs r0, CPSR
-	bic r0, r0, #0x1F
-	orr r0, r0, #SYSTEM_MODE
-	msr SPSR, r0
-	
+	msr CPSR_c, #SYSTEM_MODE
 	ldr SP, =UserStack			@ Initializes user mode stack
 	
-	mrs r0, CPSR
-	bic r0, r0, #0x1F
-	orr r0, r0, #SUPERVISOR_MODE
-	msr SPSR, r0
-
+	msr CPSR_c, #SUPERVISOR_MODE
 @ Setting GPT
 								@ Enable clock source
 	ldr r2, =GPT_CR 			@ Loading GPT_CR address
@@ -125,7 +103,6 @@ RESET_HANDLER:
 	str r0, [r1]				@ Store mask on the address
 	
 @ Setting TZIC
-
 	ldr	r1, =TZIC_BASE			@ Enable interruption controller
 
 	mov	r0, #(1 << 7)			@ Sets interruption #39 of GPT as non safe.
@@ -155,12 +132,7 @@ RESET_HANDLER:
 	str	r0, [r1, #TZIC_INTCTRL]
 
 	@ Enables interruptions
-	msr CPSR_c, #0x13	   @SUPERVISOR mode, IRQ/FIQ enabled
-	
-	mrs r0, CPSR
-	bic r0, r0, #0x1F
-	orr r0, r0, #USER_MODE
-	msr SPSR, r0
+	msr CPSR_c, #USER_MODE	   @USER mode, IRQ/FIQ enabled
 	
 	@VAI PRO MODO DE USUARIO
 
@@ -178,57 +150,6 @@ IRQ_HANDLER:
 	ldr r1, [r0]			@ Load SystemTime value on r1
 	add r1, r1, #1			@ Time + 1
 	str r1, [r0]			@ Store on SystemTime
-
-	@Checks enabled alarms
-	ldr r0, =Alarms			@ Loads Alarms base address into R0
-	mov r3, #0				@ Initializes R3 as index
-
-check_alarms:
-	ldr r4, [r0, r3]		@ Loads alarm time into R4
-	
-	cmp r4, #-1				@ Checks if it is not enabled
-	beq next_alarm
-	cmp r1, r4				@ Checks if it is not equal to system time
-	bne next_alarm
-	
-	mov r4, #-1
-	str r4, [r0, r3]		@ Disables alarm
-	
-	add r2, r3, #4
-	ldr r2, [r0, r2]		@ Load function address on r2
-	
-	push {r0-r12}
-	
-	mrs r0, CPSR
-	bic r0, r0, #0x1F
-	orr r0, r0, #USER_MODE
-	msr SPSR, r0
-	
-    blx r2					@ Invokes callback
-    
-    push {r7}
-    
-    mov r7, #15360
-    svc 0x0
-    
-    pop {r0-r12}
-    
-    mrs r0, CPSR
-	bic r0, r0, #0x1F
-	orr r0, r0, #SYSTEM_MODE
-	msr SPSR, r0
-	
-	pop {r7}
-	
-	mrs r0, CPSR
-	bic r0, r0, #0x1F
-	orr r0, r0, #IRQ_MODE
-	msr SPSR, r0
-    
-next_alarm:
-	add r3, r3, #8			@ Increments index.
-	cmp r3, #MAX_ALARMS << 3
-	blo check_alarms		@ Keep chekcing
 
 	pop {r0-r4}				@ Recovers context
 	sub lr, lr, #4			@ Correct the link register
@@ -283,17 +204,11 @@ SYSCALL_HANDLER:
 set_motor_speed_svc:
 	push {r1-r3}			@ Save context on supervisor stack
 	
-	mrs r0, CPSR
-	bic r0, r0, #0x1F
-	orr r0, r0, #SYSTEM_MODE
-	msr SPSR, r0
+	msr CPSR_c, #SYSTEM_MODE
 	
 	pop {r1, r2}			@ R1 <= P0; R2 <= P1;
 	
-	mrs r0, CPSR
-	bic r0, r0, #0x1F
-	orr r0, r0, #SUPERVISOR_MODE
-	msr SPSR, r0
+	msr CPSR_c, #SUPERVISOR_MODE
 	
 	eor r0, r0, r0			@ R0 <= 0
 	cmp r2, #0x3F
@@ -334,17 +249,11 @@ Second:
 set_motors_speed_svc:
 	push {r1-r3}			@PILHA DO TIO3
 	
-	mrs r0, CPSR
-	bic r0, r0, #0x1F
-	orr r0, r0, #SYSTEM_MODE
-	msr SPSR, r0
+	msr CPSR_c, #SYSTEM_MODE
 	
 	pop {r1, r2}			@R1 <= P0; R2 <= P1;
 	
-	mrs r0, CPSR
-	bic r0, r0, #0x1F
-	orr r0, r0, #SUPERVISOR_MODE
-	msr SPSR, r0
+	msr CPSR_c, #SUPERVISOR_MODE
 	
 	eor r0, r0, r0			@ R0 <= 0
 	cmp r2, #0x3F
@@ -358,8 +267,8 @@ set_motors_speed_svc:
 	movs pc, lr 			@Going back to users mode
 	
 continue_set_motors:
-	lsl r1, r1, #18			@ Prepare speed0 for masking
-	lsl r2, r2, #25			@ Prepare speed1 for masking
+	lsl r1, r1, #19			@ Prepare speed0 for masking
+	lsl r2, r2, #26			@ Prepare speed1 for masking
 	orr r2, r1, r2
 	
 	ldr r1, =DR				@ Load original DR
@@ -375,17 +284,11 @@ continue_set_motors:
 set_time_svc:
 	push {r0-r2}			@Saving the users register state (Supervisor stack!)
 
-	mrs r0, CPSR
-	bic r0, r0, #0x1F
-	orr r0, r0, #SYSTEM_MODE
-	msr SPSR, r0
+	msr CPSR_c, #SYSTEM_MODE
 
 	pop {r2}				@Pop the parameter value (System stack!)
 	
-	mrs r0, CPSR
-	bic r0, r0, #0x1F
-	orr r0, r0, #SUPERVISOR_MODE
-	msr SPSR, r0
+	msr CPSR_c, #SUPERVISOR_MODE
 	
 	ldr r1, =SystemTime		@Get the SystemTime address
 	str r2, [r1]			@Setting the time
@@ -408,18 +311,12 @@ get_time_svc:
 set_alarm_svc:
 	push {r1-r4}			@ Save context on supervisor stack
 
-	mrs r0, CPSR
-	bic r0, r0, #0x1F
-	orr r0, r0, #SYSTEM_MODE
-	msr SPSR, r0
+	msr CPSR_c, #SYSTEM_MODE
 
 	pop {r1, r2}			@ R1 <= Callback function pointer
 							@ R2 <= Target system time
 
-	mrs r0, CPSR
-	bic r0, r0, #0x1F
-	orr r0, r0, #SUPERVISOR_MODE
-	msr SPSR, r0
+	msr CPSR_c, #SUPERVISOR_MODE
 
 	ldr r0, =SystemTime		@ Loads SystemTime address
 	ldr r0, [r0]			@ Loads SystemTime
@@ -453,10 +350,7 @@ set_alarm_end:
 
 @---------------------------
 internal_svc:
-	mrs r7, CPSR
-	bic r7, r7, #0x1F
-	orr r7, r7, #IRQ_MODE
-	msr SPSR, r7
+	msr CPSR_c, #IRQ_MODE
 	mov pc, lr
 
 @---------------------------
