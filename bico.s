@@ -90,7 +90,6 @@ set_motor_speed_end:
 		pop {r7, pc}		@Retorna da funcao
 
 
-
 @--------------------
 @ set_motors_speed
 @
