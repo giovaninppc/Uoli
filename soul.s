@@ -247,7 +247,7 @@ Second:
 
 @---------------------------
 set_motors_speed_svc:
-	push {r1-r3}			@PILHA DO TIO3
+	push {r1-r4}			@PILHA DO TIO3
 	
 	msr CPSR_c, #SYSTEM_MODE
 	
@@ -273,11 +273,12 @@ continue_set_motors:
 	
 	ldr r1, =DR				@ Load original DR
 	ldr r3, [r1]			@ Mask it in order to update Motor0 range
-	bic r3, r3, #0x1FC0000
+	ldr r4, =0xFDFC0000
+	bic r3, r3, r4
 	orr r3, r3, r2
 	str r3, [r1]
 	
-	pop {r1-r3}				@Update DR
+	pop {r1-r4}				@Update DR
 	movs pc, lr 			@Going back to users mode
 
 @---------------------------

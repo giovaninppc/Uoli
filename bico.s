@@ -102,14 +102,25 @@ set_motor_speed_end:
 @ seta a velocidade dos motores do Uoli
 
 set_motors_speed:
-		push {lr}			@Salvando registradores callee-save
-		push {r1}			@Salvando o r1 antes de chamar a funcao (caller-save)
-	bl set_motor_speed 		@Salta para a funcao para setar a velocidade de um dos motores
-		pop {r0}			@Pega o valor salvo, mas agora em r0
-	bl set_motor_speed 		@Salta para a funcao para setar a velocidade do outro motor
-		pop {pc}			@Retorna da funcao, desempilha lr em pc
 
+@ --- CODIGO ANTIGO
+@		push {lr}			@Salvando registradores callee-save
+@		push {r1}			@Salvando o r1 antes de chamar a funcao (caller-save)
+@	bl set_motor_speed 		@Salta para a funcao para setar a velocidade de um dos motores
+@		pop {r0}			@Pega o valor salvo, mas agora em r0
+@	bl set_motor_speed 		@Salta para a funcao para setar a velocidade do outro motor
+@		pop {pc}			@Retorna da funcao, desempilha lr em pc
 
+@ --- CODIGO PARA TESTAR set_motors_speed
+		push {r7, lr}
+		ldrb r0, [r0, #1]	@Carregando em r0 a velocidade m0
+		ldrb r1, [r1, #1]	@    //     // // //    //     m1
+
+		push {r0, r1}		@empilha parametros
+		mov r7, #19 		@svs motors
+		svc 0x0				@faz a syscall
+
+		pop {r7, pc}		@volta
 
 @--------------------
 @ read_sonar
