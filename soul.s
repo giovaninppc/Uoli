@@ -163,6 +163,7 @@ RESET_HANDLER:
 	@VAI PRO MODO DE USUARIO
 
     ldr r0, =ENTRY_POINT
+    push {r0}
     bx r0
 
 IRQ_HANDLER:
@@ -178,7 +179,7 @@ IRQ_HANDLER:
 	str r1, [r0]			@ Store on SystemTime
 
 	@Checks enabled alarms
-	mov r0, =Alarms			@ Loads Alarms base address into R0
+	ldr r0, =Alarms			@ Loads Alarms base address into R0
 	mov r3, #0				@ Initializes R3 as index
 
 check_alarms:
@@ -202,11 +203,11 @@ check_alarms:
 	orr r0, r0, #USER_MODE
 	msr SPSR, r0
 	
-    bxl r2					@ Invokes callback
+    blx r2					@ Invokes callback
     
     push {r7}
     
-    mov r7, #666
+    mov r7, #15360
     svc 0x0
     
     pop {r0-r12}
@@ -216,7 +217,7 @@ check_alarms:
 	orr r0, r0, #SYSTEM_MODE
 	msr SPSR, r0
 	
-	pop{r7}
+	pop {r7}
 	
 	mrs r0, CPSR
 	bic r0, r0, #0x1F
@@ -270,7 +271,7 @@ SYSCALL_HANDLER:
 	cmp r7, #22
 	beq set_alarm_svc
 	
-	cmp r7, #666
+	cmp r7, #15360
 	beq internal_svc
 
 	@default treatment
