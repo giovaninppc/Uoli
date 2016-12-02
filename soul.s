@@ -419,7 +419,7 @@ alarm_invocation_recover:
 read_sonar_svc:
 
 							@ 0 - INICIO
-	push {r1 - r4}			@ Save context
+	push {r1 - r4}			@ Save previous context
 
 	msr CPSR_c, #SYSTEM_MODE
 	pop {r0}				@ Get parameters - r0 <= SonarID

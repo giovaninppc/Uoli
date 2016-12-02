@@ -14,14 +14,20 @@ void turnLeft(motor_cfg_t *m0, motor_cfg_t *m1);
 void amor();
 
 void main(void){
-
+/*
 	unsigned short a = read_sonar(0);
 
-	while(1){
-		a++;
-	}
+	motor_cfg_t m0, m1;
+	m0.id = 0;
+	m1.id = 1;
 
-/*
+	//moveForward(&m0, &m1);
+
+	while(1){
+		a = read_sonar(3);
+	}
+*/
+
 	motor_cfg_t m0, m1;
 	unsigned int distances[16];
 
@@ -29,7 +35,7 @@ void main(void){
 	m0.id = 0;
 	m1.id = 1;
 
-	read_sonars(3, 4, distances);
+	distances[3] = read_sonar(3);
 
 	//Busca-Parede
 	while(distances[3] > STOP_DISTANCE){
@@ -57,7 +63,7 @@ void main(void){
 		distances[0] = read_sonar(0);
 
 	}
-*/
+
 }
 
 void amor(){

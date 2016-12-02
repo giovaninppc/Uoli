@@ -155,12 +155,14 @@ read_sonars:
 
 read_sonars_loop:
 	cmp r0, r1 				@Compara o valor atual com o final
-	bge read_sonars_end		@Salta para o fim (ge ou hs???)
+	bhs read_sonars_end		@Salta para o fim (ge ou hs???)
 	mov r3, r0				@Copia o indice do sensor para r3
 
 	push {r0}				@Parametros: P0 = ID do sensor
 	svc 0x0					@Faz a syscall, le o sensor de indice P0
-	str r0, [r2, r3, lsl #2] @Salva no apontador do vetor + (deslocamento)r3*4
+	lsl r3, #2 				@Multiplica por 4
+	str r0, [r2, r3] 		@Salva no apontador do vetor + (deslocamento)r3*4
+	lsr r3, #2 				@Divide por 4
 	mov r0, r3				@Copia r3 em r0
 	b read_sonars_loop		@Salta para o loop
 
