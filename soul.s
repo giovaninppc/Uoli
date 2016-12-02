@@ -6,18 +6,16 @@
 @ System time clock divider constant
 .set TIME_SZ,			0x00000064
 
-@ Delay constants
-.set DELAY_10,			100
-.set DELAY_15,			150
-
 @ System constants
 .set MAX_ALARMS,		0x00000008
 .set MAX_CALLBACKS,		0x00000008
 .set STACK_SIZE,		0x00000064
 .set SUPERVISOR_MODE,	0x00000013
 .set IRQ_MODE,			0x00000012
+.set IRQ_MODE_NO_INT,	0x000000D2
 .set SYSTEM_MODE,		0x0000001F
 .set USER_MODE,			0x00000010
+.set USER_MODE_NO_INT,	0x000000D0
 .set GDIRMask,			0xFFFC003E
 .set ENTRY_POINT, 		0x77802000
 
@@ -144,7 +142,7 @@ RESET_HANDLER:
     bx r0
 
 IRQ_HANDLER:
-    push {r0-r4}			@ Secures context
+    push {r0-r12, lr}			@ Secures context
 
 	ldr r0, =GPT_SR			@ Signs that the interruption has been performed
 	mov r1, #1
@@ -172,32 +170,28 @@ check_alarms:
 	
 	add r2, r3, #4
 	ldr r2, [r0, r2]		@ Load function address on r2
-	
-	push {r0-r12}
-	
-	msr CPSR_c, #USER_MODE
-	
-    blx r2					@ Invokes callback
+
+	push {r0-r3}
+	msr CPSR_c, #USER_MODE_NO_INT	   @USER mode
+    blx r2
+
+	mov r0, r7
+	mov r7, #15360
+	svc 0x0
+alarm_return_point:
+	mov r7, r0
     
-    push {r7}
-    
-    mov r7, #15360
-    svc 0x0
-    
-    pop {r0-r12}
-    
-    msr CPSR_c, #SYSTEM_MODE
-	
-	pop {r7}
-	
-	msr CPSR_c, #IRQ_MODE
+    pop {r0-r3}
+
+
+
     
 next_alarm:
 	add r3, r3, #8			@ Increments index.
 	cmp r3, #MAX_ALARMS << 3
 	blo check_alarms		@ Keep chekcing
 
-	pop {r0-r4}				@ Recovers context
+	pop {r0-r12, lr}
 	sub lr, lr, #4			@ Correct the link register
 	movs pc, lr 			@ Go back to the last mode
 
@@ -240,7 +234,7 @@ SYSCALL_HANDLER:
 	beq set_alarm_svc
 	
 	cmp r7, #15360
-	beq internal_svc
+	beq alarm_invocation_recover
 
 	@default treatment
 	movs pc, lr
@@ -293,7 +287,7 @@ Second:
 
 @---------------------------
 set_motors_speed_svc:
-	push {r1-r4}			@PILHA DO TIO3
+	push {r1-r3}			@PILHA DO TIO3
 	
 	msr CPSR_c, #SYSTEM_MODE
 	
@@ -315,90 +309,107 @@ set_motors_speed_svc:
 continue_set_motors:
 	lsl r1, r1, #19			@ Prepare speed0 for masking
 	lsl r2, r2, #26			@ Prepare speed1 for masking
-	orr r2, r1, r2 			@ Concatenate the speeds
+	orr r2, r1, r2
 	
-	ldr r1, =DR				@ Load original DR address
-	ldr r3, [r1]			@ load DR value
-	ldr r4, =0xFDFC0000		@ Load mask onto r4
-	bic r3, r3, r4 			@ Mask teh DR value to recieve the speeds
-	orr r3, r3, r2 			@ Adding the speeds to the DR
-	str r3, [r1]			@ Changing the DR - passing the new speed values
+	ldr r1, =DR				@ Load original DR
+	ldr r3, [r1]			@ Mask it in order to update Motor0 range
+	bic r3, r3, #0x1FC0000
+	orr r3, r3, r2
+	str r3, [r1]
 	
-	pop {r1-r4}				@Update DR
+	pop {r1-r3}				@Update DR
 	movs pc, lr 			@Going back to users mode
 
-@---------------------------
+
+
+
+
+
+
+
+
+
+@-VERIFICATION: OK--------------------------------------------------------------
 set_time_svc:
-	push {r0-r2}			@Saving the users register state (Supervisor stack!)
+	push {r1-r2}					@ Saves previous context.
 
-	msr CPSR_c, #SYSTEM_MODE
-
-	pop {r2}				@Pop the parameter value (System stack!)
+	msr CPSR_c, #SYSTEM_MODE		@ Changes mode to SYSTEM.
+	pop {r2}						@ Gets desired system time from user stack.
+	msr CPSR_c, #SUPERVISOR_MODE	@ Changes mode back to SVC.
 	
-	msr CPSR_c, #SUPERVISOR_MODE
-	
-	ldr r1, =SystemTime		@Get the SystemTime address
-	str r2, [r1]			@Setting the time
+	ldr r1, =SystemTime				@ Gets SystemTime address.
+	str r2, [r1]					@ Updates SystemTime.
 
-	pop {r0-r2}				@Poping the Users state
-	movs pc, lr 			@Going back to users mode
+	pop {r1-r2}						@ Recovers previous context.
+	movs pc, lr 					@ Returns from syscall.
+@-------------------------------------------------------------------------------
 
-@---------------------------
+@-VERIFICATION: OK--------------------------------------------------------------
 get_time_svc:
-	push {r1}				@Saving state, context
-	
-	ldr r1, =SystemTime		@Load the SystemTime address
-	ldr r0, [r1]			@Load the SystemTime value on the return register
-	
-	pop {r1}				@Pop the user state
-	movs pc, lr 			@Go back to User mode and users code
+	ldr r0, =SystemTime				@ Loads SystemTime address.
+	ldr r0, [r0]					@ Loads SystemTime.
+	movs pc, lr 					@ Returns from syscall.
+@-------------------------------------------------------------------------------
 
-
-@---------------------------
+@-VERIFICATION: OK--------------------------------------------------------------
 set_alarm_svc:
-	push {r1-r4}			@ Save context on supervisor stack
+	push {r1-r4}					@ Saves previous context.
+	
+	msr CPSR_c, #SYSTEM_MODE		@ Changes mode to SYSTEM.
+	pop {r1, r2}					@ R1 <= Callback function pointer.
+									@ R2 <= Target system time.
+	msr CPSR_c, #SUPERVISOR_MODE	@ Goes back to SVC mode.
 
-	msr CPSR_c, #SYSTEM_MODE
+	ldr r0, =SystemTime				@ Loads SystemTime address.
+	ldr r0, [r0]					@ Loads SystemTime.
 
-	pop {r1, r2}			@ R1 <= Callback function pointer
-							@ R2 <= Target system time
-
-	msr CPSR_c, #SUPERVISOR_MODE
-
-	ldr r0, =SystemTime		@ Loads SystemTime address
-	ldr r0, [r0]			@ Loads SystemTime
-
-	cmp r2, r0				@ If target system time is less than or equal to current
-	movle r0, #-2			@system time, returns -2.
+	cmp r2, r0						@ Comperes target time to system time.
+	movle r0, #-2					@ If not greater, returns -2.
 	bls set_alarm_end
 
-	ldr r0, =Alarms			@ Loads Alarms base address into R0
-	mov r3, #0				@ Initializes R3 as index
+	ldr r0, =Alarms					@ Loads Alarms base address into R0.
+	mov r3, #0						@ Initializes R3 as iteration index.
 
 find_free_alarm:
-	ldr r4, [r0, r3]		@ Loads alarm time into R4
-	cmp r4, #-1				@ Checks if it is free (-1)
+	ldr r4, [r0, r3]				@ Loads alarm time into R4.
+	cmp r4, #-1						@ Checks if it is disabled (-1).
 	beq free_alarm_found
-	add r3, r3, #8			@ Increments index.
-	cmp r3, #MAX_ALARMS << 3
-	blo find_free_alarm		@ Keep searching
+	add r3, r3, #8					@ Increments index.
+	cmp r3, #MAX_ALARMS << 3		@ Compares to limit.
+	blo find_free_alarm				@ If it is still lower, keeps searching.
 
-	movhs r0, #-1			@ If failed, return -1
-	bhs set_alarm_end
+	movhs r0, #-1					@ Search failed. There's no free slot.
+	bhs set_alarm_end				@ Returns -1.
 
-free_alarm_found:			@ Free alarm found at r0 + r3.
-	str r2, [r0, r3]		@ Adds new alarm target time
+free_alarm_found:					@ Free alarm slot found at r0 + r3.
+	str r2, [r0, r3]				@ Adds new alarm target time.
 	add r3, r3, #4
-	str r1, [r0, r3]		@ Adds new alarm target callback
-
+	str r1, [r0, r3]				@ Adds new alarm target callback address.
+	
+	eor r0, r0, r0					@ Alarm successfully added. Returns 0.
 set_alarm_end:
-	pop {r1-r4}
-	movs pc, lr 			@Going back to users mode
+	pop {r1-r4}						@ Recovers previous context.
+	movs pc, lr 					@ Returns from syscall.
+@-------------------------------------------------------------------------------
 
-@---------------------------
-internal_svc:
-	msr CPSR_c, #IRQ_MODE
-	mov pc, lr
+@-VERIFICATION: OK--------------------------------------------------------------
+alarm_invocation_recover:
+	msr cpsr_c, #IRQ_MODE			@ Changes mode back to IRQ.	
+	b alarm_return_point			@ And returns to alarms invocation specific
+									@ location.
+@-------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
 
 @---------------------------
 read_sonar_svc:
@@ -511,3 +522,5 @@ register_proximity_callback_svc:
 	IRQStack:
 
 @ Made with <3 by Giovani & Sterle
+
+@TODO: Inicializar variaveis no reset
