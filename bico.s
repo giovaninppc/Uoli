@@ -101,25 +101,24 @@ set_motor_speed_end:
 @ seta a velocidade dos motores do Uoli
 
 set_motors_speed:
-
-@ --- CODIGO ANTIGO
-@		push {lr}			@Salvando registradores callee-save
-@		push {r1}			@Salvando o r1 antes de chamar a funcao (caller-save)
-@	bl set_motor_speed 		@Salta para a funcao para setar a velocidade de um dos motores
-@		pop {r0}			@Pega o valor salvo, mas agora em r0
-@	bl set_motor_speed 		@Salta para a funcao para setar a velocidade do outro motor
-@		pop {pc}			@Retorna da funcao, desempilha lr em pc
-
-@ --- CODIGO PARA TESTAR set_motors_speed
 		push {r7, lr}
-		ldrb r0, [r0, #1]	@Carregando em r0 a velocidade m0
-		ldrb r1, [r1, #1]	@    //     // // //    //     m1
+	ldrb r2, [r0]			@Carregando em r2 a ID de r0
+	cmp r2, #0				@Compara com 0, verifica se eh a ID do primeiro motor
+	beq get_speeds			@Salta se a ID for zero (=> r0 = m0 e r1 = m1)
 
-		push {r0, r1}		@empilha parametros
-		mov r7, #19 		@svs motors
-		svc 0x0				@faz a syscall
+	mov r2, r1				@Trocando os apontadores de structs
+	mov r1, r0 				@para o caso que
+	mov r0, r1				@se a ID nao for zero, os motores estao trocados
 
-		pop {r7, pc}		@volta
+get_speeds:
+	ldrb r0, [r0, #1]		@Carrega em r0 a velocidade do motor 0
+	ldrb r1, [r1, #1]		@Carrega em r1 a velocidade do motor 1
+
+	push {r0, r1}			@empilha parametros
+	mov r7, #19 			@svc motors
+	svc 0x0					@faz a syscall
+
+		pop {r7, pc}		@Restaura r7 e retorna da funcao
 
 @--------------------
 @ read_sonar
