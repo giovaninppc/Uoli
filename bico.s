@@ -161,7 +161,7 @@ read_sonars_loop:
 
 	push {r0}				@Parametros: P0 = ID do sensor
 	svc 0x0					@Faz a syscall, le o sensor de indice P0
-	str r0, [r2, r3, lsl #2]@Salva no apontador do vetor + (deslocamento)r3*4
+	str r0, [r2, r3, lsl #2] @Salva no apontador do vetor + (deslocamento)r3*4
 	mov r0, r3				@Copia r3 em r0
 	b read_sonars_loop		@Salta para o loop
 
@@ -170,12 +170,28 @@ read_sonars_end:
 
 
 
-
 @--------------------
 @ register_proximity_callback
-@ ??????????????? nao sei o q isso faz
+@ Parametros:
+@	r0 = id do sensor de proximidade (unsigned char)
+@	r1 = "distancia de ativacao" (unsigned short)
+@	r2 = ponteiro para funcao de callback
+@
+@	svc 17 : register_proximity_callback
+@		Parametros:
+@			P0: identificador do sonar
+@			P1: Limiar de distancia
+@			P2: ponteiro para a funcao de callback
+@
+@ Registra uma funcao de callback a ser cahamda quando o sensor em r0
+@ estiver a uma distancia menor que r1
 
 register_proximity_callback:
+		push {r7, lr} 		@ Salva registradores callee-save
+	mov r7, #17 			@ Coloca identificador da syscall em r7
+	push {r0-r2} 			@ Empilha os parametros da syscall
+	svc 0x0 				@ Faz a syscall
+		pop {r7, pc} 		@ Retorna da funcao
 
 
 @--------------------
@@ -193,6 +209,7 @@ add_alarm:
 	push {r0, r1}
 	svc 0x0
 		pop {r7, pc}
+
 
 @--------------------
 @ get_time
