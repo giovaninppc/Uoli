@@ -6,6 +6,10 @@
 @ System time clock divider constant
 .set TIME_SZ,			0x00000064
 
+@ Delay constants
+.set DELAY_15,			0x0000000F
+.set DELAY_10,			0x0000000A
+
 @ System constants
 .set MAX_ALARMS,		0x00000008
 .set MAX_CALLBACKS,		0x00000008
@@ -415,7 +419,7 @@ alarm_invocation_recover:
 read_sonar_svc:
 
 							@ 0 - INICIO
-	push {r0 - r4}			@ Save context
+	push {r1 - r4}			@ Save context
 
 	msr CPSR_c, #SYSTEM_MODE
 	pop {r0}				@ Get parameters - r0 <= SonarID
@@ -423,7 +427,7 @@ read_sonar_svc:
 
 	cmp   r0, #0			@ Compare the ID with 0, test the limits
 	movlo r0, #-1 			@ ERROR return value
-	bls read_sonar_svc_end  @ Wrong ID (<0), exit
+	blo read_sonar_svc_end  @ Wrong ID (<0), exit
 
 	cmp   r0, #15 			@ Compare ID with 15, test the limits
 	movhi r0, #-1 			@ ERROR return value
@@ -446,11 +450,11 @@ read_sonar_svc:
 		@  --- DELAY 15ms ---   @
 		ldr r2, =SystemTime		@ Load SystemTime address
 		ldr r0, [r2]			@ Load SystemTime value
-		add r0, r0, #DELAY_15   @ Set time limit
+		add r0, r0, #DELAY_15	@ Set time limit
 	read_sonar_delay1:
 		ldr r4, [r2]			@ Load SystemTime Value
 		cmp r4, r0 				@ Compare actual time with time limit
-		blo read_sonar_delay1 	@ branch back if its not over
+		bls read_sonar_delay1 	@ branch back if its not over
 		@  --- end delay 1 ---  @
 
 							@ 3 - TRIGGER <= 1 / Delay 15ms
@@ -499,7 +503,7 @@ read_sonar_flag_ok:			@ SIM - DISTANCIA <= SONAR_DATA
 	lsr r0, #6 				@ Place them correctly
 
 read_sonar_svc_end:			@ FIM
-	pop {r0 - r4}			@ Restore context
+	pop {r1 - r4}			@ Restore context
 	movs pc, lr 			@ return
 
 @---------------------------

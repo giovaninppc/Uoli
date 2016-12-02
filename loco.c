@@ -15,13 +15,7 @@ void amor();
 
 void main(void){
 
-	motor_cfg_t m0, m1;
-	int a;
-
-	m0.id = 0;
-	m1.id = 1;
-
-	moveForward(&m0, &m1);
+	unsigned short a = read_sonar(0);
 
 	while(1){
 		a++;

@@ -130,11 +130,11 @@ get_speeds:
 @ Le a distancia do sonar especificado
 
 read_sonar:
-		push {r7}			@Salva o registrador r7 q será usado para as Syscalls (callee-save)
+		push {r7, lr}		@Salva o registrador r7 q será usado para as Syscalls (callee-save)
 	mov r7, #16				@coloca o identificador da syscall em r7
 	push {r0}				@Parametros syscall: P0 = ID do sonar
 	svc 0x0					@Faz a syscall
-		pop {r7}			@Restaura o valor de r7 e retorna
+		pop {r7, pc}		@Restaura o valor de r7 e retorna
 
 
 
