@@ -6,6 +6,10 @@
 @ System time clock divider constant
 .set TIME_SZ,			0x00000064
 
+@ Delay constants
+.set DELAY_10,			100
+.set DELAY_15,			150
+
 @ System constants
 .set MAX_ALARMS,		0x00000008
 .set MAX_CALLBACKS,		0x00000008
@@ -151,6 +155,48 @@ IRQ_HANDLER:
 	add r1, r1, #1			@ Time + 1
 	str r1, [r0]			@ Store on SystemTime
 
+@Checks enabled alarms
+	ldr r0, =Alarms			@ Loads Alarms base address into R0
+	mov r3, #0				@ Initializes R3 as index
+
+check_alarms:
+	ldr r4, [r0, r3]		@ Loads alarm time into R4
+	
+	cmp r4, #-1				@ Checks if it is not enabled
+	beq next_alarm
+	cmp r1, r4				@ Checks if it is not equal to system time
+	bne next_alarm
+	
+	mov r4, #-1
+	str r4, [r0, r3]		@ Disables alarm
+	
+	add r2, r3, #4
+	ldr r2, [r0, r2]		@ Load function address on r2
+	
+	push {r0-r12}
+	
+	msr CPSR_c, #USER_MODE
+	
+    blx r2					@ Invokes callback
+    
+    push {r7}
+    
+    mov r7, #15360
+    svc 0x0
+    
+    pop {r0-r12}
+    
+    msr CPSR_c, #SYSTEM_MODE
+	
+	pop {r7}
+	
+	msr CPSR_c, #IRQ_MODE
+    
+next_alarm:
+	add r3, r3, #8			@ Increments index.
+	cmp r3, #MAX_ALARMS << 3
+	blo check_alarms		@ Keep chekcing
+
 	pop {r0-r4}				@ Recovers context
 	sub lr, lr, #4			@ Correct the link register
 	movs pc, lr 			@ Go back to the last mode
@@ -269,14 +315,14 @@ set_motors_speed_svc:
 continue_set_motors:
 	lsl r1, r1, #19			@ Prepare speed0 for masking
 	lsl r2, r2, #26			@ Prepare speed1 for masking
-	orr r2, r1, r2
+	orr r2, r1, r2 			@ Concatenate the speeds
 	
-	ldr r1, =DR				@ Load original DR
-	ldr r3, [r1]			@ Mask it in order to update Motor0 range
-	ldr r4, =0xFDFC0000
-	bic r3, r3, r4
-	orr r3, r3, r2
-	str r3, [r1]
+	ldr r1, =DR				@ Load original DR address
+	ldr r3, [r1]			@ load DR value
+	ldr r4, =0xFDFC0000		@ Load mask onto r4
+	bic r3, r3, r4 			@ Mask teh DR value to recieve the speeds
+	orr r3, r3, r2 			@ Adding the speeds to the DR
+	str r3, [r1]			@ Changing the DR - passing the new speed values
 	
 	pop {r1-r4}				@Update DR
 	movs pc, lr 			@Going back to users mode
@@ -299,12 +345,12 @@ set_time_svc:
 
 @---------------------------
 get_time_svc:
-	push {r1}			@Saving state, context
+	push {r1}				@Saving state, context
 	
 	ldr r1, =SystemTime		@Load the SystemTime address
 	ldr r0, [r1]			@Load the SystemTime value on the return register
 	
-	pop {r1}			@Pop the user state
+	pop {r1}				@Pop the user state
 	movs pc, lr 			@Go back to User mode and users code
 
 
@@ -357,7 +403,93 @@ internal_svc:
 @---------------------------
 read_sonar_svc:
 
+							@ 0 - INICIO
+	push {r0 - r4}			@ Save context
 
+	msr CPSR_c, #SYSTEM_MODE
+	pop {r0}				@ Get parameters - r0 <= SonarID
+	msr CPSR_c, #SUPERVISOR_MODE
+
+	cmp   r0, #0			@ Compare the ID with 0, test the limits
+	movlo r0, #-1 			@ ERROR return value
+	bls read_sonar_svc_end  @ Wrong ID (<0), exit
+
+	cmp   r0, #15 			@ Compare ID with 15, test the limits
+	movhi r0, #-1 			@ ERROR return value
+	bhi read_sonar_svc_end	@ Wrong ID (>15), exit
+
+							@ 1 - SONAR_MUX <= SONAR ID
+	lsl r0, #2 				@ Deslocate the sonar ID to fit the DR value position
+	ldr r1, =DR				@ Load DR address
+	ldr r3, [r1]			@ Load DR value on r3
+	bic r3, r3, #0x03C		@ Mask it in order to update Sensor ID
+	orr r3, r3, r0 			@ Add the sonar value to the DR value
+	str r3, [r1]			@ Changing the DR
+
+							@ 2 - TRIGGER <= 0 / DELAY 15ms
+	ldr r3, [r1]			@ OLHAR AKI - Precisa atualiza o valor de DR de novo???
+	bic r3, r3, #0x02		@ change the TRIGGER bit to zero
+	str r3, [r1]			@ Update DR value, trigger 0
+
+
+		@  --- DELAY 15ms ---   @
+		ldr r2, =SystemTime		@ Load SystemTime address
+		ldr r0, [r2]			@ Load SystemTime value
+		add r0, r0, #DELAY_15   @ Set time limit
+	read_sonar_delay1:
+		ldr r4, [r2]			@ Load SystemTime Value
+		cmp r4, r0 				@ Compare actual time with time limit
+		blo read_sonar_delay1 	@ branch back if its not over
+		@  --- end delay 1 ---  @
+
+							@ 3 - TRIGGER <= 1 / Delay 15ms
+	ldr r3, [r1]			@ OLHAR AKI - Precisa atualiza o valor de DR de novo???
+	add r3, r3, #2 			@ change trigger bit to 1
+	str r3, [r1]			@ Update DR value, trigger 1
+
+		@  --- DELAY 15ms ---   @
+		ldr r2, =SystemTime		@ Load SystemTime address
+		ldr r0, [r2]			@ Load SystemTime value
+		add r0, r0, #DELAY_15	@ Set time limit
+	read_sonar_delay2:
+		ldr r4, [r2]			@ Load SystemTime Value
+		cmp r4, r0 				@ Compare actual time with time limit
+		blo read_sonar_delay2 	@ branch back if its not over
+		@  --- end delay 2 ---  @
+
+							@ 4 - TRIGGER <= 0
+	ldr r3, [r1]			@ OLHAR AKI - Precisa atualiza o valor de DR de novo???
+	bic r3, r3, #0x02		@ change the TRIGGER bit to zero
+	str r3, [r1]			@ Update DR value, trigger 0
+
+read_sonar_flag:			@ 5 - CONDICAO: FLAG = 1?
+	ldr r3, [r1]			@ Check DR value
+	and r3, #1 				@ getting Flag bit
+	cmp r3, #1 				@ Comparing if flag = 1
+	beq read_sonar_flag_ok 	@ Branch to flag_ok
+
+
+		@  --- DELAY 10ms ---   @
+		ldr r2, =SystemTime		@ Load SystemTime address
+		ldr r0, [r2]			@ Load SystemTime value
+		add r0, r0, #DELAY_10   @ Set time limit
+	read_sonar_delay3:
+		ldr r4, [r2]			@ Load SystemTime Value
+		cmp r4, r0 				@ Compare actual time with time limit
+		blo read_sonar_delay3 	@ branch back if its not over
+		@  --- end delay 3 ---  @
+
+	b read_sonar_flag		@ NAO - Delay / 10ms
+
+read_sonar_flag_ok:			@ SIM - DISTANCIA <= SONAR_DATA
+	ldr r3, [r1]			@ Load DR value again
+	ldr r2, =0x3FFC0
+	and r0, r3, r2 			@ Get only the Sonar_Data bits on r0
+	lsr r0, #6 				@ Place them correctly
+
+read_sonar_svc_end:			@ FIM
+	pop {r0 - r4}			@ Restore context
+	movs pc, lr 			@ return
 
 @---------------------------
 register_proximity_callback_svc:
