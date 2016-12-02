@@ -430,8 +430,7 @@ read_sonar_svc:
 	bhi read_sonar_svc_end	@ Wrong ID (>15), exit
 
 							@ 1 - SONAR_MUX <= SONAR ID
-	lsl r0, #2 				@ Deslocate the s
-	onar ID to fit the DR value position
+	lsl r0, #2 				@ Deslocate the sonar ID to fit the DR value position
 	ldr r1, =DR				@ Load DR address
 	ldr r3, [r1]			@ Load DR value on r3
 	bic r3, r3, #0x03C		@ Mask it in order to update Sensor ID
