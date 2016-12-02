@@ -177,12 +177,6 @@ read_sonars_end:
 @	r1 = "distancia de ativacao" (unsigned short)
 @	r2 = ponteiro para funcao de callback
 @
-@	svc 17 : register_proximity_callback
-@		Parametros:
-@			P0: identificador do sonar
-@			P1: Limiar de distancia
-@			P2: ponteiro para a funcao de callback
-@
 @ Registra uma funcao de callback a ser cahamda quando o sensor em r0
 @ estiver a uma distancia menor que r1
 
