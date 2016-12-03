@@ -11,11 +11,13 @@
 .set MAX_CALLBACKS,		0x00000008
 .set STACK_SIZE,		0x00000064
 .set SUPERVISOR_MODE,	0x00000013
+.set SUPERVISOR_MODE_NI,0x000000D3
 .set IRQ_MODE,			0x00000012
-.set IRQ_MODE_NO_INT,	0x000000D2
+.set IRQ_MODE_NI,		0x000000D2
 .set SYSTEM_MODE,		0x0000001F
+.set SYSTEM_MODE_NI, 	0x000000DF
 .set USER_MODE,			0x00000010
-.set USER_MODE_NO_INT,	0x000000D0
+.set USER_MODE_NI,		0x000000D0
 .set GDIRMask,			0xFFFC003E
 .set ENTRY_POINT, 		0x77802000
 .set TRIGGER_TIME,		0x00000001
@@ -65,7 +67,7 @@ InterruptVector:
 .text
 
 RESET_HANDLER:
-	msr CPSR_c, #0xD3	   @SUPERVISOR mode, IRQ/FIQ disabled
+	msr CPSR_c, #SUPERVISOR_MODE_NI	   @SUPERVISOR mode, IRQ/FIQ disabled
 
 	@ Sets interrupt table base address on coprocessor 15.
 	ldr r0, =InterruptVector
@@ -74,13 +76,13 @@ RESET_HANDLER:
 @ Initializing stacks:
 	ldr SP, =SupervisorStack	@ Initializes supervisor mode stack
 	
-	msr CPSR_c, #IRQ_MODE
+	msr CPSR_c, #IRQ_MODE_NI
 	ldr SP, =IRQStack			@ Initializes IRQ mode stack
 	
-	msr CPSR_c, #SYSTEM_MODE
+	msr CPSR_c, #SYSTEM_MODE_NI
 	ldr SP, =UserStack			@ Initializes user mode stack
 	
-	msr CPSR_c, #SUPERVISOR_MODE
+	msr CPSR_c, #SUPERVISOR_MODE_NI
 @ Setting GPT
 								@ Enable clock source
 	ldr r2, =GPT_CR 			@ Loading GPT_CR address
@@ -172,8 +174,8 @@ check_alarms:
 	
 	cmp r4, #-1				@ Checks if it is not enabled
 	beq next_alarm
-	cmp r1, r4				@ Checks if it is not equal to system time
-	bne next_alarm
+	cmp r4, r1				@ Checks if it is not equal to system time
+	bhi next_alarm
 	
 	mov r4, #-1
 	str r4, [r0, r3]		@ Disables alarm
@@ -181,11 +183,11 @@ check_alarms:
 	ldr r2, [r0, r2]		@ Load function address on r2
 
 	push {r0-r4}
-	msr CPSR_c, #SYSTEM_MODE
+	msr CPSR_c, #SYSTEM_MODE_NI
 	mov r4, lr
-	msr CPSR_c, #IRQ_MODE
+	msr CPSR_c, #IRQ_MODE_NI
 	push {r4}
-	msr CPSR_c, #USER_MODE
+	msr CPSR_c, #USER_MODE_NI
 	
 	blx r2
 
@@ -193,14 +195,29 @@ check_alarms:
 	svc 0x0
 alarm_return_point:
 	pop {r0}
-	msr CPSR_c, #SYSTEM_MODE
+	msr CPSR_c, #SYSTEM_MODE_NI
 	mov lr, r0
-	msr CPSR_c, #IRQ_MODE
+	msr CPSR_c, #IRQ_MODE_NI
 	pop {r0-r4}
 next_alarm:
 	add r3, r3, #8			@ Increments index.
 	cmp r3, #MAX_ALARMS << 3
 	blo check_alarms		@ Keep chekcing
+
+	@TESTE@@@@@@@@@@@@@@@@@
+	push {r0-r12}
+	msr CPSR_c, #IRQ_MODE
+
+	ldr r0, =SystemTime
+	ldr r1, [r0]
+
+	cmp r1, #1
+loopInfinito:
+	beq loopInfinito
+
+	pop {r0-r12}
+	msr CPSR_c, #IRQ_MODE_NI
+	@@@@@@@@@@@@@@@@@@@@@@@@
 
 	pop {r0-r12}
 	sub lr, lr, #4			@ Correct the link register
@@ -396,7 +413,7 @@ set_alarm_end:
 
 @-VERIFICATION: OK--------------------------------------------------------------
 alarm_invocation_recover:
-	msr cpsr_c, #IRQ_MODE			@ Changes mode back to IRQ.
+	msr cpsr_c, #IRQ_MODE_NI		@ Changes mode back to IRQ.
 	b alarm_return_point			@ And returns to alarms invocation specific
 									@ location.
 @-------------------------------------------------------------------------------
@@ -444,7 +461,7 @@ read_sonar_delay2:
 
 	bic r3, r3, #0x02				@ Sets trigger bit to low.
 	str r3, [r1]					@ Updates DR.
-	
+
 read_sonar_flag_1:					@ Waits for flag to go high.
 	ldr r3, [r1]					@ Checks DR value...
 	and r3, #1 						@ ...getting flag bit.
@@ -474,7 +491,7 @@ register_proximity_callback_svc:
 	cmp r1, #15						@ Compares |ID| with 15, testing limits.
 	movhi r0, #-2					@ Wrong ID, returns -2.
 	bhs set_callback_end
-	
+
 	ldr r4, =ActiveCallbacks		@ Loads ActiveCallbacks address.
 	ldr r4, [r4]					@ Loads ActiveCallbacks.
 
