@@ -14,7 +14,7 @@ void turnLeft(motor_cfg_t *m0, motor_cfg_t *m1);
 void amor();
 
 void main(void){
-/*
+
 	unsigned short a = read_sonar(0);
 
 	motor_cfg_t m0, m1;
@@ -26,9 +26,9 @@ void main(void){
 	while(1){
 		a = read_sonar(3);
 	}
-*/
 
-	motor_cfg_t m0, m1;
+
+/*	motor_cfg_t m0, m1;
 	unsigned int distances[16];
 
 	//Inicializando Valores para controle do Uoli
@@ -49,7 +49,7 @@ void main(void){
 		turnRight(&m0, &m1);
 		distances[0] = read_sonar(0);
 	}
-
+	//stop(&m0, &m1);
 	while(1){ //Repete infinitamente quando entra nessa rotina
 
 		//Mantem o Uoli alinhado com a parede
@@ -58,12 +58,17 @@ void main(void){
 			distances[0] = read_sonar(0);
 		}
 
+		if(distances[3] < STOP_DISTANCE){
+			turnRight(&m0, &m1);
+		}
+
 		//Se está alinhado com a parede, move em frente
 		moveForward(&m0, &m1);
 		distances[0] = read_sonar(0);
+		distances[3] = read_sonar(3);
 
 	}
-
+*/
 }
 
 void amor(){
@@ -103,7 +108,7 @@ void stop(motor_cfg_t *m0, motor_cfg_t *m1){
  *	void */
 void turnRight(motor_cfg_t *m0, motor_cfg_t *m1){
 
-	m0->speed = 10;
+	m0->speed = 1;
 	m1->speed = 0;
 	set_motors_speed(m0, m1);
 }
@@ -116,6 +121,6 @@ void turnRight(motor_cfg_t *m0, motor_cfg_t *m1){
 void turnLeft(motor_cfg_t *m0, motor_cfg_t *m1){
 
 	m0->speed = 0;
-	m1->speed = 10;
+	m1->speed = 1;
 	set_motors_speed(m0, m1);
 }
