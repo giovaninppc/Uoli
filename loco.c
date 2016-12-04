@@ -19,18 +19,29 @@ void main(void){
 
 
 	//unsigned short a = read_sonar(0);
-	add_alarm(loop3, 5);
+	//add_alarm(loop3, 5);
 	motor_cfg_t m0, m1;
 	m0.id = 0;
 	m1.id = 1;
 
-	register_proximity_callback(4, STOP_DISTANCE, stop2);
 	moveForward(&m0, &m1);
-	int a;
+	int b;
+	int a = read_sonar(3);
+	b = a;
+	while(1)
+		{
+			if(b != a){
+				b = a;
+			}
+			a = read_sonar(3);
+		}
 
-	while(1){
+	/*while(1){
+		if(b != a){
+			b = a;
+		}
 		a = read_sonar(3);
-	}
+	}*/
 
 /*
 	motor_cfg_t m0, m1;
@@ -111,9 +122,9 @@ void amor(){
  *	void */
 void moveForward(motor_cfg_t *m0, motor_cfg_t *m1){
 
-	m0->speed = 35;
-	m1->speed = 35;
-	set_motors_speed(m0, m1);
+	m0->speed = 5;
+	m1->speed = 5;
+	//set_motors_speed(m0, m1);
 }
 
 /*Seta as velocidades dos motores para 0 - para o Uoli

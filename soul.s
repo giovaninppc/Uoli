@@ -20,8 +20,7 @@
 .set USER_MODE_NI,		0x000000D0
 .set GDIRMask,			0xFFFC003E
 .set ENTRY_POINT, 		0x77802000
-.set TRIGGER_TIME,		0x00000001
-.set DIST_INTERVAL,		TRIGGER_TIME * MAX_CALLBACKS << 1
+.set DIST_INTERVAL,		0x00000020
 
 @ GPT registers addresses constants.
 .set GPT_CR,			0x53FA0000
@@ -83,6 +82,40 @@ RESET_HANDLER:
 	ldr SP, =UserStack			@ Initializes user mode stack
 	
 	msr CPSR_c, #SUPERVISOR_MODE_NI
+
+@ Initializing Local Variables
+	ldr r0, =NextCallbackTime 	@ Loads NextCallbackTime address.
+	mov r1, #DIST_INTERVAL		@ R1 <= 0
+	str r1, [r0]				@ Reset SystemTime to 0
+	
+	ldr r0, =SystemTime 		@ Load SystemTime address
+	mov r1, #0 					@ R1 <= 0
+	str r1, [r0]				@ Reset SystemTime to 0
+
+	ldr r0, =ActiveCallbacks	@ Load ActiveCallbacks address
+	str r1, [r0]				@ Reset to 0
+
+	ldr r0, =Alarms 			@ Load Alarms address on r0
+	mov r2, #-1 				@ Move to r2 the Alarms initialization value
+	
+reset_vectors_1:
+	str r2, [r0, r1, lsl #2]	@ Stores -1 on the Alarms position
+	add r1, r1, #1 				@ Add 1 to the counter
+	cmp r1, #MAX_ALARMS << 1	@ Compare with limit
+	blo reset_vectors_1			@ Repeat if necessary
+	
+	mov r2, #1 					@ Move to r4 the Sonars initialization value
+	lsl r2, #12
+	sub r2, r2, #1
+	ldr r0, =SonarRanges
+
+	mov r1, #0
+reset_vectors_2:
+	str r2, [r0, r1, lsl #2]	@ Stores 4095 on the Sonars position
+	add r1, r1, #1 				@ Add 1 to the counter
+	cmp r1, #16			 		@ Compare with limit
+	blo reset_vectors_2			@ Repeat if necessary
+
 @ Setting GPT
 								@ Enable clock source
 	ldr r2, =GPT_CR 			@ Loading GPT_CR address
@@ -144,9 +177,8 @@ RESET_HANDLER:
 	
 	@VAI PRO MODO DE USUARIO
 
-    ldr r0, =ENTRY_POINT
-    bx r0
-
+	ldr r0, =ENTRY_POINT
+	bx r0
 
 
 
@@ -154,76 +186,168 @@ RESET_HANDLER:
 
 
 IRQ_HANDLER:
-    push {r0-r12}			@ Secures context
+	push {r0-r12}					@ Saves previous context.
 
-	ldr r0, =GPT_SR			@ Signs that the interruption has been performed
-	mov r1, #1
+	ldr r0, =GPT_SR					@ Signs that the interruption has been
+	mov r1, #1						@ 	performed.
 	str r1, [r0]
-	
-	ldr r0, =SystemTime		@ Increments system clock
-	ldr r1, [r0]			@ Load SystemTime value on r1
-	add r1, r1, #1			@ Time + 1
-	str r1, [r0]			@ Store on SystemTime
 
-@Checks enabled alarms
-	ldr r0, =Alarms			@ Loads Alarms base address into R0
-	eor r3, r3, r3			@ Initializes R3 as index
+	ldr r5, =SystemTime				@ Loads SystemTime address into R5.
+	ldr r6, [r5]					@ Loads SystemTime into R6.
+
+	and r0, r6, #0x1F				@ Determines sonar ID based on SystemTime.
+	lsr r0, #1						@ R0 <= ID.
+	
+	ands r1, r6, #1					@ If SystemTime is even...-----------------
+	ldr r1, =DR						@ Loads DR address.                        |
+	beq state1						@            Skips to first state of FSM.<-
+	
+@ FSM second state: reset trigger, wait for flag to go high and read range.
+	ldr r3, [r1]					@ Loads DR current value.
+	bic r3, r3, #2					@ Sets trigger bit to low.
+	str r3, [r1]					@ Updates DR.
+	
+read_sonar_flag:					@ Waits for flag to go high.
+	ldr r3, [r1]					@ Checks DR value...
+	and r3, #1 						@ ...getting flag bit.
+	cmp r3, #1 						@ Compares it to 1.
+	bne read_sonar_flag				@ Repeats while not 1.
+
+	ldr r3, [r1]					@ Loads DR value again.
+	ldr r2, =0x3FFC0				@ Loads mask. 
+	and r2, r3, r2 					@ Gets only the Sonar_Data bits on R0.
+	lsr r2, #6 						@ Right shifts value.
+	ldr r1, =SonarRanges			@ Stores it on corresponding position of
+	str r2, [r1, r0, lsl #2]		@ SonarRanges vector.
+	
+	b continue						@ Skips fisrt state.
+	
+state1:
+@ FSM first state: set trigger, and set sonar ID on MUX range of DR.
+	lsl r0, #2 						@ Prepares ID to place it on DR.
+	ldr r3, [r1]					@ Loads DR current value.
+	bic r3, r3, #0x03C				@ Masks it in order to update sensor ID.
+	orr r3, r3, r0
+	orr r3, r3, #2 					@ Sets trigger bit to high.
+	str r3, [r1]					@ Updates DR.
+
+continue:
+	add r6, r6, #1					@ Increments SystemTime.
+	str r6, [r5]					@ Updates it.
+
+@ Checks enabled alarms.
+	ldr r0, =Alarms					@ Loads Alarms base address into R0.
+	eor r3, r3, r3					@ Initializes R3 as index.
 
 check_alarms:
-	ldr r4, [r0, r3]		@ Loads alarm time into R4
-	
-	cmp r4, #-1				@ Checks if it is not enabled
+	ldr r4, [r0, r3]				@ Loads alarm time into R4.
+
+	cmp r4, #-1						@ Checks if it is not enabled.
 	beq next_alarm
-	cmp r4, r1				@ Checks if it is not equal to system time
+	cmp r4, r6						@ Checks if it has not expired yet.
 	bhi next_alarm
-	
-	mov r4, #-1
-	str r4, [r0, r3]		@ Disables alarm
+
+	mov r4, #-1						@ Disables alarm.
+	str r4, [r0, r3]				@ Assigning -1 as its target time.
 	add r2, r3, #4
-	ldr r2, [r0, r2]		@ Load function address on r2
+	ldr r2, [r0, r2]				@ Loads function address on R2.
 
-	push {r0-r4}
-	msr CPSR_c, #SYSTEM_MODE_NI
-	mov r4, lr
+	push {r0-r4}					@ Saves current context.
+	msr CPSR_c, #SYSTEM_MODE_NI		@ Switches to SYSTEM mode.
+	mov r4, lr						@ Stores user LR to R4.
 	msr CPSR_c, #IRQ_MODE_NI
-	push {r4}
-	msr CPSR_c, #USER_MODE_NI
+	push {r4}						@ Saves user LR on IRQ stack.
+	msr CPSR_c, #USER_MODE_NI		@ Changes mode to USER.
 	
-	blx r2
+	blx r2							@ And jumps to user callback function.
 
-	mov r7, #15360
+	mov r7, #15360					@ Gets back to IRQ mode using syscall #15360
 	svc 0x0
 alarm_return_point:
-	pop {r0}
-	msr CPSR_c, #SYSTEM_MODE_NI
+
+	pop {r0}						@ Pops user LR into R0.
+	msr CPSR_c, #SYSTEM_MODE_NI		@ And recovers it.
 	mov lr, r0
-	msr CPSR_c, #IRQ_MODE_NI
-	pop {r0-r4}
+	msr CPSR_c, #IRQ_MODE_NI		@ Gets back to IRQ mode.
+	pop {r0-r4}						@ Recovers context.
+
 next_alarm:
-	add r3, r3, #8			@ Increments index.
-	cmp r3, #MAX_ALARMS << 3
-	blo check_alarms		@ Keep chekcing
+	add r3, r3, #8					@ Increments index to check other alarms...
+	cmp r3, #MAX_ALARMS << 3		@ Until limit.
+	blo check_alarms				@ Keeps chekcing.
 
-	@TESTE@@@@@@@@@@@@@@@@@
-	push {r0-r12}
-	msr CPSR_c, #IRQ_MODE
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	ldr r0, =NextCallbackTime		@ Loads NextCallbackTime address into R0.
+	ldr r1, [r0]					@ Loads NextCallbackTime into R0.
+	cmp r1, r6						@ Compares it to SystemTime.
+	bhi irq_handler_end				@ If higher, skips to irq_handler_end.
 
-	ldr r0, =SystemTime
-	ldr r1, [r0]
+	add r1, r1, #DIST_INTERVAL		@ Increments and updates NextCallbackTime.
+	str r1, [r0]
 
-	cmp r1, #1
-loopInfinito:
-	beq loopInfinito
+@ Checks enabled callbacks.
+	ldr r0, =Callbacks				@ Loads Callbacks base address into R0.
+	eor r3, r3, r3					@ Initializes R3 as index.
+	ldr r1, =ActiveCallbacks		@ Calculates index limit using number
+	ldr r2, [r1]					@ of active callbacks.
+	
+	add r1, r2, #0					@ R1 <= 3*R2.
+	lsl r1, #1
+	add r1, r2, r1
 
-	pop {r0-r12}
+check_callbacks:
+	cmp r3, r1						@ Compares index to limit.
+	bhs irq_handler_end				@ Continues if it is still valid.
+
+	ldr r4, [r3, r0]				@ Loads callback sonar ID into R4.
+	add r3, r3, #4
+	ldr r5, [r3, r0]				@ Loads callback threshold into R5.
+	add r3, r3, #4
+	ldr r6, [r3, r0]				@ Loads callback function pointer into R6.
+	add r3, r3, #4
+
+	ldr r2, =SonarRanges			@ Loads sonar range into R2.
+	ldr r2, [r2, r4, lsl #2]
+	
+	cmp r2, r5						@ Compares range to threshold.
+	bhs check_callbacks				@ Gets back if range is not smaller.
+
+	push {r0-r6}					@ Saves current context.
+	msr CPSR_c, #SYSTEM_MODE_NI		@ Switches to SYSTEM mode.
+	mov r4, lr						@ Stores user LR to R4.
 	msr CPSR_c, #IRQ_MODE_NI
-	@@@@@@@@@@@@@@@@@@@@@@@@
+	push {r4}						@ Saves user LR on IRQ stack.
+	msr CPSR_c, #USER_MODE_NI		@ Changes mode to USER.
+	
+	blx r6							@ And jumps to user callback function.
 
-	pop {r0-r12}
-	sub lr, lr, #4			@ Correct the link register
-	movs pc, lr 			@ Go back to the last mode
+	mov r7, #15872					@ Gets back to IRQ mode using syscall #15872
+	svc 0x0
+callback_return_point:
+
+	pop {r0}						@ Pops user LR into R0.
+	msr CPSR_c, #SYSTEM_MODE_NI		@ And recovers it.
+	mov lr, r0
+	msr CPSR_c, #IRQ_MODE_NI		@ Gets back to IRQ mode.
+	pop {r0-r6}						@ Recovers context.
+	b check_callbacks				@ Keeps checking callbacks.
+
+irq_handler_end:
 
 
+
+	pop {r0-r12}					@ Recovers original context.
+	sub lr, lr, #4					@ Corrects IRQ LR.
+	movs pc, lr 					@ Goes back to the last mode.
 
 
 
@@ -261,6 +385,9 @@ SYSCALL_HANDLER:
 
 	cmp r7, #15360
 	beq alarm_invocation_recover
+	
+	cmp r7, #15872
+	beq callback_invocation_recover
 
 	movs pc, lr						@ Default treatment.
 @-------------------------------------------------------------------------------
@@ -341,6 +468,7 @@ continue_set_motors:
 	ldr r1, =DR						@ Loads original DR.
 	ldr r3, [r1]					@ Mask it in order to update motors range.
 	bic r3, r3, #0x1FC0000
+	bic r3, r3, #0xFE000000
 	orr r3, r3, r2
 	str r3, [r1]					@ Updates DR.
 	
@@ -400,7 +528,7 @@ find_free_alarm:
 	movhs r0, #-1					@ Search failed. There's no free slot.
 	bhs set_alarm_end				@ Returns -1.
 
-free_alarm_found:					@ Free alarm slot found at r0 + r3.
+free_alarm_found:					@ Free alarm slot found at R0 + R3.
 	str r2, [r0, r3]				@ Adds new alarm target time.
 	add r3, r3, #4
 	str r1, [r0, r3]				@ Adds new alarm target callback address.
@@ -413,68 +541,45 @@ set_alarm_end:
 
 @-VERIFICATION: OK--------------------------------------------------------------
 alarm_invocation_recover:
+	mrs r7, spsr
+	bic r7, #0xFF
+	orr r7, r7, #IRQ_MODE_NI
+	msr spsr, r7
+
 	msr cpsr_c, #IRQ_MODE_NI		@ Changes mode back to IRQ.
 	b alarm_return_point			@ And returns to alarms invocation specific
 									@ location.
 @-------------------------------------------------------------------------------
 
 @-VERIFICATION: OK--------------------------------------------------------------
+callback_invocation_recover:
+	mrs r7, spsr
+	bic r7, #0xFF
+	orr r7, r7, #IRQ_MODE_NI
+	msr spsr, r7
+
+	msr cpsr_c, #IRQ_MODE_NI		@ Changes mode back to IRQ.
+	b callback_return_point			@ And returns to alarms invocation specific
+									@ location.
+@-------------------------------------------------------------------------------
+
+@-VERIFICATION: OK--------------------------------------------------------------
 read_sonar_svc:
-	push {r1 - r4}					@ Saves previous context.
+	push {r1}						@ Saves previous context.
 
 	msr CPSR_c, #SYSTEM_MODE		@ Changes mode to SYSTEM.
-	pop {r0}						@ GetS parameters from user stack. R0 <= ID.
+	pop {r1}						@ GetS parameters from user stack. R1 <= ID.
 	msr CPSR_c, #SUPERVISOR_MODE	@ Goes back to SVC mode.
 
-	cmp   r0, #15					@ Compares |ID| with 15, testing limits.
+	cmp   r1, #15					@ Compares |ID| with 15, testing limits.
 	movhi r0, #-1					@ Wrong ID, R0 <= -1.
 	bhi read_sonar_svc_end			@ Wrong ID, exits.
 
-	lsl r0, #2 						@ Prepares ID to place it on DR.
-	ldr r1, =DR						@ Loads DR address.
-	ldr r3, [r1]					@ Loads DR current value.
-	bic r3, r3, #0x03C				@ Masks it in order to update sensor ID.
-	orr r3, r3, r0
-	str r3, [r1]					@ Updates DR.
-
-	bic r3, r3, #0x2				@ Sets trigger bit to low.
-	str r3, [r1]					@ Updates DR.
-
-	ldr r2, =SystemTime				@ Loads SystemTime address.
-	ldr r0, [r2]					@ Loads SystemTime current.
-	add r0, r0, #TRIGGER_TIME		@ Set time limit.
-
-read_sonar_delay1:
-	ldr r4, [r2]					@ Loads SystemTime value.
-	cmp r4, r0 						@ Compares current time with time limit.
-	blo read_sonar_delay1 			@ Repeats while TRIGGER_TIME has not elapsed
-
-	orr r3, r3, #2 					@ Sets trigger bit to high.
-	str r3, [r1]					@ Updates DR.
-
-	add r0, r0, #TRIGGER_TIME		@ Sets time limit.
-
-read_sonar_delay2:
-	ldr r4, [r2]					@ Loads SystemTime value.
-	cmp r4, r0						@ Compares current time with time limit.
-	blo read_sonar_delay2			@ Repeats while TRIGGER_TIME has not elapsed
-
-	bic r3, r3, #0x02				@ Sets trigger bit to low.
-	str r3, [r1]					@ Updates DR.
-
-read_sonar_flag_1:					@ Waits for flag to go high.
-	ldr r3, [r1]					@ Checks DR value...
-	and r3, #1 						@ ...getting flag bit.
-	cmp r3, #1 						@ Compares it to 1.
-	bne read_sonar_flag_1			@ Repeats while not 1.
-
-	ldr r3, [r1]					@ Loads DR value again.
-	ldr r2, =0x3FFC0
-	and r0, r3, r2 					@ Gets only the Sonar_Data bits on r0.
-	lsr r0, #6 						@ Place them correctly.
+	ldr r0, =SonarRanges			@ Load range vector.
+	ldr r0, [r0, r1, lsl #2]		@ Load the sonar value on r0.
 
 read_sonar_svc_end:
-	pop {r1 - r4}					@ Recovers previous context.
+	pop {r1}						@ Recovers previous context.
 	movs pc, lr 					@ Returns from syscall.
 @-------------------------------------------------------------------------------
 
@@ -491,7 +596,7 @@ register_proximity_callback_svc:
 	cmp r1, #15						@ Compares |ID| with 15, testing limits.
 	movhi r0, #-2					@ Wrong ID, returns -2.
 	bhs set_callback_end
-
+	
 	ldr r4, =ActiveCallbacks		@ Loads ActiveCallbacks address.
 	ldr r4, [r4]					@ Loads ActiveCallbacks.
 
@@ -536,21 +641,35 @@ set_callback_end:
 @Data Section>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 .data
-SystemTime:
+									@ Defining System Local variables
+SystemTime:							@ Defining 1 byte to SystemTime variable
 	.fill 1, 4, 0
-Alarms:
-	.fill 2*MAX_ALARMS, 4, -1
-Callbacks:
-	.fill 3*MAX_CALLBACKS, 4, -1
-ActiveCallbacks:
+NextCallbackTime:
 	.fill 1, 4, 0
 
+Alarms:								@ Defining a Vector to store the User Alarms
+	.fill 2*MAX_ALARMS, 4, -1
+
+Callbacks:							@ Defining a vector to store the callback functions
+	.fill 3*MAX_CALLBACKS, 4, -1
+
+ActiveCallbacks:					@ creating the variable to store the active callbacks
+	.fill 1, 4, 0
+
+SonarRanges:						@ Creating space to the vector of teh sonar ranges
+	.fill 16, 4, 0 					@ it stores all the sonar ranges of the robot
+
+									@ Defining space for the system stacks
 	.fill STACK_SIZE, 4, 0
-UserStack:
+UserStack:							@ User Stack
+
 	.fill STACK_SIZE, 4, 0
-SupervisorStack:
+SupervisorStack:					@ Supervisor Stack
+
 	.fill STACK_SIZE, 4, 0
-IRQStack:
+IRQStack:							@ IRQ Stack
+
+
 @ Made with <3 by Giovani & Sterle
 
 @TODO: Inicializar variaveis no reset

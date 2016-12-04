@@ -108,7 +108,7 @@ set_motors_speed:
 
 	mov r2, r1				@Trocando os apontadores de structs
 	mov r1, r0 				@para o caso que
-	mov r0, r1				@se a ID nao for zero, os motores estao trocados
+	mov r0, r2				@se a ID nao for zero, os motores estao trocados
 
 get_speeds:
 	ldrb r0, [r0, #1]		@Carrega em r0 a velocidade do motor 0
@@ -219,7 +219,7 @@ get_time:
 	mov r1, r0				@ Coloca em r1 o endereco da variavel de retorno
 	mov r7, #20				@ Syscall 20 - get_time
 	svc 0x0					@ Faz a syscall - retorna em r0 o tempo do sistema
-	ldr r0, [r1]			@ Salva o tempo no endereco passado
+	str r0, [r1]			@ Salva o tempo no endereco passado
 		pop {r7, pc}		@ Retorna da funcao
 
 
