@@ -7,112 +7,65 @@
 #include "api_robot2.h"
 #define STOP_DISTANCE 1200
 
-void moveForward(motor_cfg_t *m0, motor_cfg_t *m1);
-void stop(motor_cfg_t *m0, motor_cfg_t *m1);
-void turnRight(motor_cfg_t *m0, motor_cfg_t *m1);
-void turnLeft(motor_cfg_t *m0, motor_cfg_t *m1);
-void amor();
-void loop3();
-void stop2();
+void moveForward();
+void stop();
+void turnRight();
+void turnLeft();
+void f();
+void g();
+
+
+motor_cfg_t m0, m1;
 
 void main(void){
 
-
-	//unsigned short a = read_sonar(0);
-	//add_alarm(loop3, 5);
-	motor_cfg_t m0, m1;
-	m0.id = 0;
-	m1.id = 1;
-
-	moveForward(&m0, &m1);
-	int b;
-	int a = read_sonar(3);
-	b = a;
-	while(1)
-		{
-			if(b != a){
-				b = a;
-			}
-			a = read_sonar(3);
-		}
-
-	/*while(1){
-		if(b != a){
-			b = a;
-		}
-		a = read_sonar(3);
-	}*/
-
-/*
-	motor_cfg_t m0, m1;
-	unsigned int distances[16];
-
 	//Inicializando Valores para controle do Uoli
-	m0.id = 0;
-	m1.id = 1;
+	//m0.id = 0;
+	//m1.id = 1;
 
-	distances[3] = read_sonar(3);
+
+	//add_alarm(g, 10);
+
+	while(1);
+
+	//moveForward();
 
 	//Busca-Parede
-	while(distances[3] > STOP_DISTANCE){
-		moveForward(&m0, &m1);
-		distances[3] = read_sonar(3);
-	}
+	//while(read_sonar(3) > STOP_DISTANCE);
+
+	//stop();
 
 	//Segue-Parede
-	distances[0] = read_sonar(0);
-	while(distances[0] > STOP_DISTANCE){
-		turnRight(&m0, &m1);
-		distances[0] = read_sonar(0);
-	}
-	//stop(&m0, &m1);
+	/*turnRight();
+	while(read_sonar(0) > STOP_DISTANCE);
+	
 	while(1){ //Repete infinitamente quando entra nessa rotina
 
 		//Mantem o Uoli alinhado com a parede
-		while(distances[0] > STOP_DISTANCE){
-			turnLeft(&m0, &m1);
-			distances[0] = read_sonar(0);
+		while(read_sonar(0) > STOP_DISTANCE){
+			turnLeft();
 		}
 
-		while(distances[3] < STOP_DISTANCE){
-			turnRight(&m0, &m1);
-			distances[0] = read_sonar(0);
+		while(read_sonar(3) < STOP_DISTANCE){
+			turnRight();
 		}
-
 		//Se está alinhado com a parede, move em frente
-		moveForward(&m0, &m1);
-		distances[0] = read_sonar(0);
-		distances[3] = read_sonar(3);
-
-	}
-*/
+		moveForward();
+	}*/
 }
 
-void loop3(){
-	int a, b;
+void f(){
+	turnRight();
+	int a;
 	get_time(&a);
-	b = a;
-	while(1){
-		if(b != a){
-			b = a + 5;
-		}
-		get_time(&b);
-	}
+	add_alarm(g, a + 10);
 }
 
-void stop2(){
-	motor_cfg_t m0, m1;
-	m0.id = 0;
-	m1.id = 1;
-	m0.speed = 0;
-	m1.speed = 0;
-	set_motors_speed(&m0, &m1);
-}
-
-void amor(){
-	int b;
-	get_time(&b);
-	return;
+void g(){
+	moveForward();
+	int a;
+	get_time(&a);
+	add_alarm(f, a + 10);
 }
 
 /*Faz o Uoli se movimentar para a frente
@@ -120,11 +73,11 @@ void amor(){
  *	2 apontadores para structs do tipo motor com as ids dos motores
  *Retorno:
  *	void */
-void moveForward(motor_cfg_t *m0, motor_cfg_t *m1){
+void moveForward(){
 
-	m0->speed = 5;
-	m1->speed = 5;
-	//set_motors_speed(m0, m1);
+	m0.speed = 63;
+	m1.speed = 63;
+	set_motors_speed(&m0, &m1);
 }
 
 /*Seta as velocidades dos motores para 0 - para o Uoli
@@ -132,11 +85,11 @@ void moveForward(motor_cfg_t *m0, motor_cfg_t *m1){
  *	2 apontadores para structs do tipo motor com as ids dos motores
  *Retorno:
  *	void */
-void stop(motor_cfg_t *m0, motor_cfg_t *m1){
+void stop(){
 	
-	m0->speed = 0;
-	m1->speed = 0;
-	set_motors_speed(m0, m1);	
+	m0.speed = 0;
+	m1.speed = 0;
+	set_motors_speed(&m0, &m1);	
 }
 
 /*Faz o Uoli girar para a direita
@@ -144,11 +97,11 @@ void stop(motor_cfg_t *m0, motor_cfg_t *m1){
  *	2 apontadores para structs do tipo motor com as ids dos motores
  *Retorno:
  *	void */
-void turnRight(motor_cfg_t *m0, motor_cfg_t *m1){
+void turnRight(){
 
-	m0->speed = 1;
-	m1->speed = 0;
-	set_motors_speed(m0, m1);
+	m0.speed = 10;
+	m1.speed = 0;
+	set_motors_speed(&m0, &m1);
 }
 
 /*Faz o Uoli girar para a esquerda
@@ -156,9 +109,9 @@ void turnRight(motor_cfg_t *m0, motor_cfg_t *m1){
  *	2 apontadores para structs do tipo motor com as ids dos motores
  *Retorno:
  *	void */
-void turnLeft(motor_cfg_t *m0, motor_cfg_t *m1){
+void turnLeft(){
 
-	m0->speed = 0;
-	m1->speed = 1;
-	set_motors_speed(m0, m1);
+	m0.speed = 0;
+	m1.speed = 10;
+	set_motors_speed(&m0, &m1);
 }
