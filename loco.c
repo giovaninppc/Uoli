@@ -5,7 +5,7 @@
  */
 
 #include "api_robot2.h"
-#define STOP_DISTANCE 1200
+#define STOP_DISTANCE 800
 
 void moveForward();
 void stop();
@@ -13,60 +13,46 @@ void turnRight();
 void turnLeft();
 void f();
 void g();
+void desviar();
 
 
 motor_cfg_t m0, m1;
+int t = 0;
 
 void main(void){
 
 	//Inicializando Valores para controle do Uoli
-	//m0.id = 0;
-	//m1.id = 1;
+	m0.id = 0;
+	m1.id = 1;
 
-
-	//add_alarm(g, 10);
+	//register_proximity_callback(3, STOP_DISTANCE, desviar);
+	add_alarm(g, 10);
 
 	while(1);
 
-	//moveForward();
-
-	//Busca-Parede
-	//while(read_sonar(3) > STOP_DISTANCE);
-
-	//stop();
-
-	//Segue-Parede
-	/*turnRight();
-	while(read_sonar(0) > STOP_DISTANCE);
-	
-	while(1){ //Repete infinitamente quando entra nessa rotina
-
-		//Mantem o Uoli alinhado com a parede
-		while(read_sonar(0) > STOP_DISTANCE){
-			turnLeft();
-		}
-
-		while(read_sonar(3) < STOP_DISTANCE){
-			turnRight();
-		}
-		//Se está alinhado com a parede, move em frente
-		moveForward();
-	}*/
 }
 
 void f(){
 	turnRight();
 	int a;
 	get_time(&a);
-	add_alarm(g, a + 10);
+	add_alarm(g, a + 50);
 }
 
 void g(){
 	moveForward();
 	int a;
 	get_time(&a);
-	add_alarm(f, a + 10);
+	t += 10;
+	add_alarm(f, a + 50 + t);
 }
+
+void desviar(){
+	turnRight();
+	while(read_sonar(3) < STOP_DISTANCE);
+	stop();
+}
+
 
 /*Faz o Uoli se movimentar para a frente
  *Parametros:
@@ -97,9 +83,9 @@ void stop(){
  *	2 apontadores para structs do tipo motor com as ids dos motores
  *Retorno:
  *	void */
-void turnRight(){
+void turnLeft(){
 
-	m0.speed = 10;
+	m0.speed = 13;
 	m1.speed = 0;
 	set_motors_speed(&m0, &m1);
 }
@@ -109,9 +95,9 @@ void turnRight(){
  *	2 apontadores para structs do tipo motor com as ids dos motores
  *Retorno:
  *	void */
-void turnLeft(){
+void turnRight(){
 
 	m0.speed = 0;
-	m1.speed = 10;
+	m1.speed = 13;
 	set_motors_speed(&m0, &m1);
 }
