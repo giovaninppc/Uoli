@@ -6,6 +6,7 @@
 
 #include "api_robot2.h"
 #define STOP_DISTANCE 800
+#define TIME_DELAY 200
 
 void moveForward();
 void stop();
@@ -25,7 +26,7 @@ void main(void){
 	m0.id = 0;
 	m1.id = 1;
 
-	//register_proximity_callback(3, STOP_DISTANCE, desviar);
+	register_proximity_callback(3, STOP_DISTANCE, desviar);
 	add_alarm(g, 10);
 
 	while(1);
@@ -36,15 +37,15 @@ void f(){
 	turnRight();
 	int a;
 	get_time(&a);
-	add_alarm(g, a + 50);
+	add_alarm(g, a + TIME_DELAY);
 }
 
 void g(){
 	moveForward();
 	int a;
 	get_time(&a);
-	t += 10;
-	add_alarm(f, a + 50 + t);
+	t += 30;
+	add_alarm(f, a + TIME_DELAY + t);
 }
 
 void desviar(){
