@@ -368,8 +368,8 @@ set_motor_speed_svc:
 	push {r1-r3}					@ Saves previous context.
 
 	msr CPSR_c, #SYSTEM_MODE		@ Changes mode to SYSTEM.
-	pop {r1, r2}					@ Gets desired parameters from user stack.
-									@ R1 <= id; R2 <= speed.
+	ldr r1, [sp]					@ R1 <= id;
+	ldr r2, [sp, #4]				@ R2 <= speed;
 	msr CPSR_c, #SUPERVISOR_MODE	@ Changes mode back to SVC.
 
 	eor r0, r0, r0					@ R0 <= 0.
@@ -414,8 +414,8 @@ set_motors_speed_svc:
 	push {r1-r3}					@ Saves previous context.
 	
 	msr CPSR_c, #SYSTEM_MODE		@ Changes mode to SYSTEM.
-	pop {r1, r2}					@ Gets desired parameters from user stack.
-									@R1 <= speed0; R2 <= speed1.
+	ldr r1, [sp]					@ R1 <= speed0;
+	ldr r2, [sp, #4]				@ R2 <= speed;
 	msr CPSR_c, #SUPERVISOR_MODE	@ Changes mode back to SVC.
 	
 	eor r0, r0, r0					@ R0 <= 0.
@@ -452,7 +452,7 @@ set_time_svc:
 	push {r1-r2}					@ Saves previous context.
 
 	msr CPSR_c, #SYSTEM_MODE		@ Changes mode to SYSTEM.
-	pop {r2}						@ Gets desired system time from user stack.
+	ldr r2, [sp]					@ Gets desired system time from user stack.
 	msr CPSR_c, #SUPERVISOR_MODE	@ Changes mode back to SVC.
 	
 	ldr r1, =SystemTime				@ Gets SystemTime address.
@@ -474,8 +474,8 @@ set_alarm_svc:
 	push {r1-r4}					@ Saves previous context.
 	
 	msr CPSR_c, #SYSTEM_MODE		@ Changes mode to SYSTEM.
-	pop {r1, r2}					@ R1 <= Callback function pointer.
-									@ R2 <= Target system time.
+	ldr r1, [sp]					@ R1 <= Callback function pointer.
+	ldr r2, [sp, #4]				@ R2 <= Target system time.
 	msr CPSR_c, #SUPERVISOR_MODE	@ Goes back to SVC mode.
 
 	ldr r0, =SystemTime				@ Loads SystemTime address.
@@ -543,7 +543,7 @@ read_sonar_svc:
 	str r0, [r1]					@ interfering on sonar read process.
 
 	msr CPSR_c, #SYSTEM_MODE		@ Changes mode to SYSTEM.
-	pop {r0}						@ GetS parameters from user stack. R0 <= ID.
+	ldr r0, [sp]					@ GetS parameters from user stack. R0 <= ID.
 	msr CPSR_c, #SUPERVISOR_MODE	@ Goes back to SVC mode.
 
 	cmp r0, #15						@ Compares |ID| with 15, testing limits.
@@ -602,9 +602,9 @@ register_proximity_callback_svc:
 	push {r1-r5}					@ Saves previous context.
 
 	msr CPSR_c, #SYSTEM_MODE		@ Changes mode to SYSTEM.
-	pop {r1-r3}						@ R1 <= Sonar ID.
-									@ R2 <= Threshold distance.
-									@ R3 <= Callback function pointer.
+	ldr r1, [sp]					@ R1 <= Sonar ID.
+	ldr r2, [sp, #4]				@ R2 <= Threshold distance.
+	ldr r3, [sp, #8]				@ R3 <= Callback function pointer.
 	msr CPSR_c, #SUPERVISOR_MODE	@ Goes back to SVC mode.
 
 	cmp r1, #15						@ Compares |ID| with 15, testing limits.

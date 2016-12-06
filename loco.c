@@ -33,6 +33,7 @@ void main(void){
 
 }
 
+/**/
 void f(){
 	turnRight();
 	int a;
