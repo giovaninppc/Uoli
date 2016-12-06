@@ -1,22 +1,27 @@
 /* Giovani Nascimento Pereira - 168609
  * MC404 - Projeto 2 - Uoli / 2016/2S
  * LoCo - Segue Parede
- * Controla o Uoli de forma a encontrar uma parede e segui-la
+ * Controla o Uoli de forma a rondar o espaco em torno do robo
+ * fazendo uma espiral quadrada (aproximadamente)
+ * e desviando de paredes
  */
 
-#include "api_robot2.h"
-#define STOP_DISTANCE 800
-#define TIME_DELAY 200
+#include 	"api_robot2.h"
+#define 	STOP_DISTANCE 500
+#define 	TURN_TIME 250
+#define 	TIME_DELAY 100
 
+/*Funcoes de Movimentacao*/
 void moveForward();
 void stop();
 void turnRight();
 void turnLeft();
+
 void f();
 void g();
 void desviar();
 
-
+//Definindo motores para uso
 motor_cfg_t m0, m1;
 int t = 0;
 
@@ -26,6 +31,10 @@ void main(void){
 	m0.id = 0;
 	m1.id = 1;
 
+	//Logica da ronda - um callback para desviar de obstaculos
+	//Um alarma que "seta" alarmes sequencialmente
+	//  Alarme 1 (g)- Anda em linha reta por x + t tempo (incrementa t)
+	//  Alarme 2 (f)- Faz uma curva para a direita
 	register_proximity_callback(3, STOP_DISTANCE, desviar);
 	add_alarm(g, 10);
 
@@ -33,22 +42,35 @@ void main(void){
 
 }
 
-/**/
+/* FUNCAO PARA ALARME
+ * Faz o Uoli fazer uma curva para a direita
+ * "Seta" um alarme para faze-lo ir para frente*/
 void f(){
 	turnRight();
 	int a;
 	get_time(&a);
-	add_alarm(g, a + TIME_DELAY);
+	add_alarm(g, a + TURN_TIME);
 }
 
+/* FUNCAO PARA ALARME
+ * Faz o Uoli andar para frente
+ * "Seta" um alarme para faze-lo virar*/
 void g(){
 	moveForward();
 	int a;
 	get_time(&a);
-	t += 30;
+	t += 1;
 	add_alarm(f, a + TIME_DELAY + t);
+	
+	if(t == 50)
+		t = 0;	//Reinicia Ronda em 50!
 }
 
+/* FUNCAO DE PROXIMITY CALLBACK
+ * Faz o Uoli desviar de uma parede
+ * Depois faz ele para até a proxima execucao
+ * (isso impede que gire mais que o necessario)
+ * Invocada por proximity_callback*/
 void desviar(){
 	turnRight();
 	while(read_sonar(3) < STOP_DISTANCE);
