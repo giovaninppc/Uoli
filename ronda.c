@@ -60,7 +60,7 @@ void g(){
 	int a;
 	get_time(&a);
 	t += 1;
-	add_alarm(f, a + TIME_DELAY + t);
+	add_alarm(f, a + TIME_DELAY*t);
 	
 	if(t == 50)
 		t = 0;	//Reinicia Ronda em 50!
@@ -85,8 +85,8 @@ void desviar(){
  *	void */
 void moveForward(){
 
-	m0.speed = 63;
-	m1.speed = 63;
+	m0.speed = 40;
+	m1.speed = 40;
 	set_motors_speed(&m0, &m1);
 }
 
