@@ -167,7 +167,7 @@ read_sonars_loop:
 	str r0, [r2, r3, lsl #2] @ Salva no apontador do vetor + 
 							 @ (deslocamento)r3*4
 	pop  {r0} 				@ Desempilha os parametros
-	mov r0, r3				@ Copia r3 em r0
+	add r0, r3, #1 			@ Incrementa 1 o contador e poe em r0
 	b read_sonars_loop		@ Salta para o loop
 
 read_sonars_end:

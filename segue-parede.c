@@ -20,11 +20,11 @@ void desviar();
 //Definindo motores para uso
 motor_cfg_t m0, m1;
 
-void main(){
+void _start(){
 
 	//Inicializando ID dos motores
 	m0.id = 0;
-	m1.id = 0;
+	m1.id = 1;
 	//register_proximity_callback(3, STOP_DISTANCE, desviar);
 
 	//logica 1: Encontra parede
