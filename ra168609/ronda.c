@@ -7,8 +7,9 @@
  */
 
 #include 	"api_robot2.h"
-#define 	STOP_DISTANCE 1000
-#define 	TURN_TIME 4
+#define 	STOP_DISTANCE 800
+#define 	TURN_TIME 230
+#define 	TIME_DELAY 100
 
 /*Funcoes de Movimentacao*/
 void moveForward();
@@ -35,7 +36,7 @@ void _start(){
 	//  Alarme 1 (g)- Anda em linha reta por x + t tempo (incrementa t)
 	//  Alarme 2 (f)- Faz uma curva para a direita
 	register_proximity_callback(3, STOP_DISTANCE, desviar);
-	add_alarm(avanca, 1);
+	add_alarm(avanca, 10);
 
 	while(1);
 
@@ -60,7 +61,7 @@ void avanca(){
 	int a;
 	get_time(&a);
 	t += 1;
-	add_alarm(fazCurva, a + t);
+	add_alarm(fazCurva, a + TIME_DELAY*t);
 	
 	if(t == 50)
 		t = 0;	//Reinicia Ronda em 50!

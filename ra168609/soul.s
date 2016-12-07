@@ -4,11 +4,8 @@
 @ Operational System - SOUL
 
 @-VERIFICATION: OK--------------------------------------------------------------
-@ System time constants.
+@ System time clock divider constant.
 .set TIME_SZ,			0x00000064
-.set TIME_DIVIDER,		0X00000100
-.set DIST_INTERVAL,		0x00000100
-.set DELAY_CYCLES,		0x00000064
 
 @ System constants
 .set MAX_ALARMS,		0x00000008
@@ -24,6 +21,8 @@
 .set USER_MODE_NI,		0x000000D0
 .set GDIRMask,			0xFFFC003E
 .set ENTRY_POINT, 		0x77802000
+.set DIST_INTERVAL,		0x00000020
+.set DELAY_TIME,		0x00000064
 
 @ GPT registers addresses constants.
 .set GPT_CR,			0x53FA0000
@@ -87,17 +86,10 @@ RESET_HANDLER:
 	mov r1, #DIST_INTERVAL			@ R1 <= DIST_INTERVAL.
 	str r1, [r0]					@ Sets NextCallbackTime to DIST_INTERVAL
 	
-	ldr r0, =NextSystemTimeTick 	@ Loads NextSystemTimeTick address.
-	mov r1, #TIME_DIVIDER			@ R1 <= TIME_DIVIDER.
-	str r1, [r0]					@ Sets NextSystemTimeTick to TIME_DIVIDER
-	
 	ldr r0, =SystemTime 			@ Load SystemTime address.
 	mov r1, #0 						@ R1 <= 0.
 	str r1, [r0]					@ Resets SystemTime.
-	
-	ldr r0, =IRQCounter 			@ Load IRQCounter address.
-	str r1, [r0]					@ Resets IRQCounter.
-	
+
 	ldr r0, =ActiveCallbacks		@ Loads ActiveCallbacks address.
 	str r1, [r0]					@ Resets.
 	
@@ -167,32 +159,14 @@ reset_vectors:
 
 @-VERIFICATION: OK--------------------------------------------------------------
 IRQ_HANDLER:
-	push {r0-r12, lr}				@ Saves previous context.
-	
-	mrs r0, spsr					@ Saves original SPSR.
-	push {r0}
-	
+	push {r0-r12}					@ Saves previous context.
+
 	ldr r0, =GPT_SR					@ Signs that the interruption has been
 	mov r1, #1						@ 	performed.
 	str r1, [r0]
 
-	ldr r0, =IRQCounter				@ Loads IRQCounter address into R0.
-	ldr r10, [r0]					@ Loads IRQCounter into R10.
-	add r10, r10, #1				@ Increments IRQCounter.
-	str r10, [r0]					@ Updates it.
-
-	ldr r0, =NextSystemTimeTick		@ Loads NextSystemTimeTick address into R0.
-	ldr r1, [r0]					@ Loads NextSystemTimeTick into R10.
-	sub r1, r1, #1					@ Decrements NextSystemTimeTick.
-	cmp r1, #0
-	movlt r1, #TIME_DIVIDER
-	str r1, [r0]					@ And updates it.
-	
-	cmp r1, #0
-	bne callbacks_check_begin
-
-	ldr r1, =SystemTime				@ Loads SystemTime address into R1.
-	ldr r0, [r1]					@ Loads SystemTime into R0.
+	ldr r1, =SystemTime				@ Loads SystemTime address into R5.
+	ldr r0, [r1]					@ Loads SystemTime into R6.
 	add r0, r0, #1					@ Increments SystemTime.
 	str r0, [r1]					@ Updates it.
 
@@ -246,19 +220,17 @@ next_alarm:
 	cmp r3, #MAX_ALARMS << 3		@ Until limit.
 	blo check_alarms				@ Keeps chekcing.
 
-callbacks_check_begin:
 	ldr r1, =NextCallbackTime		@ Loads NextCallbackTime address into R1.
 	ldr r2, [r1]					@ Loads NextCallbackTime into R2.
-	sub r2, r2, #1					@ Decrements and updates NextCallbackTime.
-	cmp r2, #0
-	movlt r2, #DIST_INTERVAL
-	str r2, [r1]
-
-	bne irq_handler_usual_end		@ Goes to irq_handler_usual_end if not NULL.
+	cmp r2, r0						@ Compares it to SystemTime.
+	bhi irq_handler_usual_end		@ If higher, skips to irq_handler_usual_end.
 
 	ldr r0, =ReadingSonar			@ Loads ReadingSonar address.
 	ldr r0, [r0]					@ Loads ReadingSonar.
 	cmp r0, #0
+
+	addeq r2, r2, #DIST_INTERVAL	@ Increments and updates NextCallbackTime.
+	streq r2, [r1]
 	bne irq_handler_usual_end		@ If user is reading a sonar, skips verif.
 
 	ldr r1, =ActiveCallbacks		@ Loads number of ActiveCallbacks.
@@ -293,7 +265,7 @@ check_callbacks:
 	bic r7, r7, #0x2				@ Sets trigger bit to low.
 	str r7, [r8]					@ Updates DR.
 
-	ldr r4, =DELAY_CYCLES			@ Loads DELAY_CYCLES.
+	ldr r4, =DELAY_TIME				@ Loads DELAY_TIME.
 read_sonar_delay_irq1:
 	sub r4, r4, #1					@ Decrements counter.
 	cmp r4, #0
@@ -302,7 +274,7 @@ read_sonar_delay_irq1:
 	orr r7, r7, #2 					@ Sets trigger bit to high.
 	str r7, [r8]					@ Updates DR.
 
-	ldr r4, =DELAY_CYCLES			@ Loads DELAY_CYCLES.
+	ldr r4, =DELAY_TIME				@ Loads DELAY_TIME.
 read_sonar_delay_irq2:
 	sub r4, r4, #1					@ Decrements counter.
 	cmp r4, #0
@@ -354,10 +326,7 @@ irq_handler_usual_end:
 	str r7, [r4]
 
 irq_handler_end:
-	pop {r0}
-	msr spsr, r0					@ Recovers original SPSR.
-	
-	pop {r0-r12, lr}				@ Recovers original context.
+	pop {r0-r12}					@ Recovers original context.
 	sub lr, lr, #4					@ Corrects IRQ LR.
 	movs pc, lr 					@ Goes back to the last mode.
 @-------------------------------------------------------------------------------
@@ -589,7 +558,7 @@ read_sonar_svc:
 	bic r3, r3, #0x2				@ Sets trigger bit to low.
 	str r3, [r1]					@ Updates DR.
 
-	ldr r0, =DELAY_CYCLES			@ Loads DELAY_CYCLES.
+	ldr r0, =DELAY_TIME				@ Loads DELAY_TIME.
 read_sonar_delay1:
 	sub r0, r0, #1					@ Decrements counter.
 	cmp r0, #0
@@ -598,7 +567,7 @@ read_sonar_delay1:
 	orr r3, r3, #2 					@ Sets trigger bit to high.
 	str r3, [r1]					@ Updates DR.
 
-	ldr r0, =DELAY_CYCLES			@ Loads DELAY_CYCLES.
+	ldr r0, =DELAY_TIME				@ Loads DELAY_TIME.
 read_sonar_delay2:
 	sub r0, r0, #1					@ Decrements counter.
 	cmp r0, #0
@@ -675,10 +644,6 @@ set_callback_end:
 @-VERIFICATION: OK--------------------------------------------------------------
 .data
 SystemTime:							@ Defining System variables.
-	.fill 1, 4, 0
-IRQCounter:							@ Defining System variables.
-	.fill 1, 4, 0
-NextSystemTimeTick:
 	.fill 1, 4, 0
 NextCallbackTime:
 	.fill 1, 4, 0
