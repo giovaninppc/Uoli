@@ -5,15 +5,9 @@
 
 @-VERIFICATION: OK--------------------------------------------------------------
 @ System time constants.
-<<<<<<< HEAD
 .set TIME_SZ,			0x0000FF00
 .set TIME_DIVIDER,		0X00000003
 .set DIST_INTERVAL,		0x0000000A
-=======
-.set TIME_SZ,			0x00000064
-.set TIME_DIVIDER,		0X00000100
-.set DIST_INTERVAL,		0x00000100
->>>>>>> 96596bd3f4a3cb66954467c25b614c9fb1137f30
 .set DELAY_CYCLES,		0x00000064
 
 @ System constants
@@ -101,12 +95,6 @@ RESET_HANDLER:
 	mov r1, #0 						@ R1 <= 0.
 	str r1, [r0]					@ Resets SystemTime.
 	
-<<<<<<< HEAD
-=======
-	ldr r0, =IRQCounter 			@ Load IRQCounter address.
-	str r1, [r0]					@ Resets IRQCounter.
-	
->>>>>>> 96596bd3f4a3cb66954467c25b614c9fb1137f30
 	ldr r0, =ActiveCallbacks		@ Loads ActiveCallbacks address.
 	str r1, [r0]					@ Resets.
 	
@@ -149,17 +137,10 @@ reset_vectors:
 	
 @ Setting TZIC:
 	ldr	r1, =TZIC_BASE				@ Enables interruption controller.
-<<<<<<< HEAD
 
 	mov	r0, #(1 << 7)				@ Sets interruption #39 of GPT as
 	str	r0, [r1, #TZIC_INTSEC1]		@ non safe.
 
-=======
-
-	mov	r0, #(1 << 7)				@ Sets interruption #39 of GPT as
-	str	r0, [r1, #TZIC_INTSEC1]		@ non safe.
-
->>>>>>> 96596bd3f4a3cb66954467c25b614c9fb1137f30
 	mov	r0, #(1 << 7)				@ Enables GPT interruption #39
 	str	r0, [r1, #TZIC_ENSET1]
 
@@ -192,18 +173,8 @@ IRQ_HANDLER:
 	mov r1, #1						@ 	performed.
 	str r1, [r0]
 
-<<<<<<< HEAD
 	ldr r0, =NextSystemTimeTick		@ Loads NextSystemTimeTick address into R0.
 	ldr r1, [r0]					@ Loads NextSystemTimeTick into R1.
-=======
-	ldr r0, =IRQCounter				@ Loads IRQCounter address into R0.
-	ldr r10, [r0]					@ Loads IRQCounter into R10.
-	add r10, r10, #1				@ Increments IRQCounter.
-	str r10, [r0]					@ Updates it.
-
-	ldr r0, =NextSystemTimeTick		@ Loads NextSystemTimeTick address into R0.
-	ldr r1, [r0]					@ Loads NextSystemTimeTick into R10.
->>>>>>> 96596bd3f4a3cb66954467c25b614c9fb1137f30
 	sub r1, r1, #1					@ Decrements NextSystemTimeTick.
 	cmp r1, #0
 	movlt r1, #TIME_DIVIDER
@@ -251,7 +222,6 @@ check_alarms:
 	msr CPSR_c, #USER_MODE			@ Changes mode to USER.
 
 	blx r2							@ And jumps to user callback function.
-<<<<<<< HEAD
 
 	mov r7, #15360					@ Gets back to IRQ mode using syscall #15360
 	svc 0x0
@@ -307,63 +277,6 @@ check_callbacks:
 	ldr r6, [r3, r0]				@ Loads callback function pointer into R6.
 	add r3, r3, #4
 
-=======
-
-	mov r7, #15360					@ Gets back to IRQ mode using syscall #15360
-	svc 0x0
-alarm_return_point:
-
-	pop {r0}						@ Pops user LR into R0.
-	msr CPSR_c, #SYSTEM_MODE_NI		@ And recovers it.
-	mov lr, r0
-	msr CPSR_c, #IRQ_MODE_NI		@ Gets back to IRQ mode.
-	pop {r0-r4}						@ Recovers context.
-
-next_alarm:
-	add r3, r3, #8					@ Increments index to check other alarms...
-	cmp r3, #MAX_ALARMS << 3		@ Until limit.
-	blo check_alarms				@ Keeps chekcing.
-
-callbacks_check_begin:
-	ldr r1, =NextCallbackTime		@ Loads NextCallbackTime address into R1.
-	ldr r2, [r1]					@ Loads NextCallbackTime into R2.
-	sub r2, r2, #1					@ Decrements and updates NextCallbackTime.
-	cmp r2, #0
-	movlt r2, #DIST_INTERVAL
-	str r2, [r1]
-
-	bne irq_handler_usual_end		@ Goes to irq_handler_usual_end if not NULL.
-
-	ldr r0, =ReadingSonar			@ Loads ReadingSonar address.
-	ldr r0, [r0]					@ Loads ReadingSonar.
-	cmp r0, #0
-	bne irq_handler_usual_end		@ If user is reading a sonar, skips verif.
-
-	ldr r1, =ActiveCallbacks		@ Loads number of ActiveCallbacks.
-	ldr r2, [r1]
-	cmp r2, #0
-	bls irq_handler_usual_end		@ If null, skips to irq_handler_usual_end.
-
-	add r1, r2, #0					@ Calculates index limit using number
-	lsl r1, #1						@ of active callbacks.
-	add r1, r2, r1					@ R1 <= 3*R2.
-	
-@ Checks enabled callbacks.
-	ldr r0, =Callbacks				@ Loads Callbacks base address into R0.
-	eor r3, r3, r3					@ Initializes R3 as index.
-
-check_callbacks:
-	cmp r3, r1						@ Compares index to limit.
-	bhs irq_handler_usual_end		@ Continues if it is still valid.
-
-	ldr r4, [r3, r0]				@ Loads callback sonar ID into R4.
-	add r3, r3, #4
-	ldr r5, [r3, r0]				@ Loads callback threshold into R5.
-	add r3, r3, #4
-	ldr r6, [r3, r0]				@ Loads callback function pointer into R6.
-	add r3, r3, #4
-
->>>>>>> 96596bd3f4a3cb66954467c25b614c9fb1137f30
 	lsl r4, #2 						@ Prepares ID to place it on DR.
 	ldr r8, =DR						@ Loads DR address.
 	ldr r7, [r8]					@ Loads DR current value.
@@ -754,11 +667,6 @@ set_callback_end:
 .data
 SystemTime:							@ Defining System variables.
 	.fill 1, 4, 0
-<<<<<<< HEAD
-=======
-IRQCounter:							@ Defining System variables.
-	.fill 1, 4, 0
->>>>>>> 96596bd3f4a3cb66954467c25b614c9fb1137f30
 NextSystemTimeTick:
 	.fill 1, 4, 0
 NextCallbackTime:
